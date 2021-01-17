@@ -1,0 +1,16 @@
+networks:
+  - network: example 
+    nick: bot_nickname
+    server: irc.example.com
+    port: 6667
+    ssl: false
+    admins:
+      - 'owner!owner@example.com'
+    channels:
+      - '#example'
+
+wolfram_alpha:
+  apikey: '123-ABC-789-XYZ'
+
+openweathermap:
+  apikey: '123-ABC-789-XYZ'
