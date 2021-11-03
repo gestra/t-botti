@@ -85,7 +85,12 @@ fn response_from_xml(xml: &str) -> Result<String, String> {
     Ok(msg)
 }
 
-pub async fn command_wa(bot_sender: mpsc::Sender<BotAction>, source: IrcChannel, params: &str, config: Arc<yaml::Yaml>) {
+pub async fn command_wa(
+    bot_sender: mpsc::Sender<BotAction>,
+    source: IrcChannel,
+    params: &str,
+    config: Arc<yaml::Yaml>,
+) {
     if let Some(apikey) = config["wolfram_alpha"]["apikey"].as_str() {
         if let Ok(xml) = get_xml(params, apikey).await {
             if let Ok(response) = response_from_xml(&xml) {

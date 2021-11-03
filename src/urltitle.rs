@@ -4,6 +4,7 @@
 
 use chrono::prelude::*;
 use http::Method;
+use log::debug;
 use regex::Regex;
 use reqwest::header::{HeaderMap, HeaderName, CONTENT_LENGTH, CONTENT_TYPE};
 use select::document::Document;
@@ -19,6 +20,8 @@ lazy_static! {
 }
 
 async fn title_from_url(url: &str) -> Option<String> {
+    debug!("Trying to get title for url {}", url);
+
     lazy_static! {
         static ref RE_TWITTER_URL: Regex =
             Regex::new(r"https?://(?:mobile\.)?twitter\.com/[^/]+/status/(?P<id>\d+)/?.*").unwrap();
@@ -27,12 +30,14 @@ async fn title_from_url(url: &str) -> Option<String> {
     if RE_TWITTER_URL.is_match(url) {
         let caps = RE_TWITTER_URL.captures(url)?;
         let id = caps.name("id")?.as_str();
+        debug!("Looks like a Twitter URL");
         return parse_twitter(id).await;
     }
 
     let resp = match HTTP_CLIENT.get(url).send().await {
         Ok(r) => r,
-        Err(_) => {
+        Err(e) => {
+            debug!("Could not get url {}: {}", url, e);
             return None;
         }
     };
@@ -44,6 +49,7 @@ async fn title_from_url(url: &str) -> Option<String> {
             .unwrap()
             .starts_with("text/html")
     {
+        debug!("Not a HTML file");
         return None;
     }
 
@@ -61,6 +67,7 @@ async fn title_from_url(url: &str) -> Option<String> {
             }
         };
         if length > 2048 {
+            debug!("Content length > 2MB, not fetching");
             return None;
         }
     }
@@ -79,6 +86,7 @@ async fn title_from_url(url: &str) -> Option<String> {
         if let Some(t) = node.attr("property") {
             if t == "og:title" {
                 if let Some(title) = node.attr("content") {
+                    debug!("Title found in og:title");
                     found_title = Some(title.to_string());
                 }
             }
@@ -87,6 +95,7 @@ async fn title_from_url(url: &str) -> Option<String> {
 
     if found_title.is_none() {
         if let Some(node) = document.find(Name("title")).next() {
+            debug!("Title found in title tag");
             found_title = Some(node.text());
         }
     }
@@ -119,7 +128,7 @@ async fn send_title(sender: mpsc::Sender<BotAction>, target: IrcChannel, url: &s
 pub async fn handle_url_titles(sender: mpsc::Sender<BotAction>, source: IrcChannel, msg: &str) {
     for mat in RE_URL.find_iter(msg) {
         let url = mat.as_str().to_string();
-        eprintln!("URL DETECTED: {}", url);
+        debug!("URL DETECTED: {}", url);
 
         let s = sender.clone();
         let src = IrcChannel {

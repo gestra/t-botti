@@ -11,7 +11,7 @@ use std::io::prelude::*;
 use std::path::Path;
 use std::sync::Arc;
 
-use log::error;
+use log::{error, info};
 
 #[macro_use]
 extern crate lazy_static;
@@ -71,9 +71,7 @@ fn read_config_file() -> Result<String, ()> {
 
     let mut s = String::new();
     match file.read_to_string(&mut s) {
-        Ok(_) => {
-            Ok(s)
-        }
+        Ok(_) => Ok(s),
         Err(_) => {
             error!("Error when reading config.yml");
             Err(())
@@ -101,7 +99,7 @@ fn get_config() -> Result<Vec<Yaml>, ()> {
 
 #[tokio::main]
 async fn main() -> Result<(), irc::error::Error> {
-    env_logger::init();
+    env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("info")).init();
 
     let config = match get_config() {
         Ok(y) => Arc::new(y[0].clone()),
@@ -110,6 +108,8 @@ async fn main() -> Result<(), irc::error::Error> {
             return Ok(());
         }
     };
+
+    info!("Successfully read config file");
 
     let (botaction_tx, botaction_rx) = mpsc::channel(10);
     let (ircdata_tx, ircdata_rx) = mpsc::channel(10);
@@ -122,24 +122,30 @@ async fn main() -> Result<(), irc::error::Error> {
     tasks.push(tokio::spawn(async move {
         irc_loop(ircdata_tx, botaction_rx, clientquery_rx, c1).await
     }));
+    info!("Started irc_loop");
 
     let rssbot_tx = botaction_tx.clone();
     tasks.push(tokio::spawn(async move { rss_manager(rssbot_tx).await }));
+    info!("Started rss_manager");
 
     let t_tx = botaction_tx.clone();
     tasks.push(tokio::spawn(
         async move { timer_manager(timer_rx, t_tx).await },
     ));
+    info!("Started timer_manager");
 
     let messagehandler_tx = botaction_tx.clone();
     let c2 = config.clone();
     tasks.push(tokio::spawn(async move {
         message_handler(ircdata_rx, messagehandler_tx, timer_tx, clientquery_tx, c2).await
     }));
+    info!("Started message_handler");
 
     for task in tasks {
         let _ = tokio::join!(task);
     }
+
+    info!("All tasks finished");
 
     Ok(())
 }

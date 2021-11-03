@@ -6,7 +6,7 @@ use core::time::Duration;
 
 use feed_rs::parser;
 
-use log::debug;
+use log::{info, warn};
 
 use rusqlite::{named_params, params};
 
@@ -44,7 +44,10 @@ pub struct FeedInfo {
 pub async fn command_rss(sender: mpsc::Sender<BotAction>, source: IrcChannel, params: &str) {
     match rsscommand_from_params(params) {
         Some(RssCommand::Add(url)) => {
-            debug!("Adding feed: {}", url);
+            info!(
+                "Adding feed to channel {}/{}: {}",
+                source.network, source.channel, url
+            );
             add_feed(sender, &source, &url).await;
         }
         Some(RssCommand::Remove(id)) => {
@@ -52,6 +55,10 @@ pub async fn command_rss(sender: mpsc::Sender<BotAction>, source: IrcChannel, pa
             let res = remove_feed(&conn, &source, id);
             match res {
                 Ok(()) => {
+                    info!(
+                        "Removed feed id {} from {}/{}",
+                        id, source.network, source.channel
+                    );
                     sender
                         .send(BotAction {
                             target: source,
@@ -61,6 +68,7 @@ pub async fn command_rss(sender: mpsc::Sender<BotAction>, source: IrcChannel, pa
                         .unwrap();
                 }
                 Err(e) => {
+                    warn!("Error when removing feed: {}", e);
                     sender
                         .send(BotAction {
                             target: source,
@@ -152,6 +160,7 @@ async fn add_feed(sender: mpsc::Sender<BotAction>, target: &IrcChannel, url: &st
     let feed_body = match get_url(url).await {
         Ok(r) => r,
         Err(_) => {
+            warn!("Could not fetch url: {}", url);
             sender
                 .send(BotAction {
                     target: IrcChannel {
@@ -171,7 +180,8 @@ async fn add_feed(sender: mpsc::Sender<BotAction>, target: &IrcChannel, url: &st
 
     let parsed = match parse_feed(&feed_body, url) {
         Ok(p) => p,
-        Err(_) => {
+        Err(e) => {
+            warn!("Could not parse feed: {:?}", e);
             sender
                 .send(BotAction {
                     target: IrcChannel {
@@ -194,6 +204,7 @@ async fn add_feed(sender: mpsc::Sender<BotAction>, target: &IrcChannel, url: &st
     let result = add_feed_to_db(&conn, parsed, target);
     match result {
         Ok(_) => {
+            info!("Successfully added feed {}", url);
             sender
                 .send(BotAction {
                     target: IrcChannel {
@@ -205,7 +216,8 @@ async fn add_feed(sender: mpsc::Sender<BotAction>, target: &IrcChannel, url: &st
                 .await
                 .unwrap();
         }
-        Err(_) => {
+        Err(e) => {
+            warn!("Database error when adding feed: {:?}", e);
             sender
                 .send(BotAction {
                     target: IrcChannel {
@@ -221,8 +233,6 @@ async fn add_feed(sender: mpsc::Sender<BotAction>, target: &IrcChannel, url: &st
                 .unwrap();
         }
     }
-
-    debug!("Finished adding feed {}", url);
 }
 
 fn remove_feed(conn: &rusqlite::Connection, source: &IrcChannel, id: i64) -> Result<(), String> {
@@ -417,6 +427,7 @@ fn add_entry_to_db(conn: &rusqlite::Connection, entry: &feed_rs::model::Entry, f
 }
 
 async fn refresh_feeds(sender: mpsc::Sender<BotAction>) {
+    info!("Starting feed refresh");
     let conn = open_db(false).unwrap();
     let feeds = get_all_feeds(&conn).unwrap();
     for feed in feeds {
@@ -441,6 +452,10 @@ async fn refresh_feeds(sender: mpsc::Sender<BotAction>) {
         }
 
         for entry in to_output {
+            info!(
+                "New feed item from feed {} for {}/{}: {}",
+                feed.title, feed.target.network, feed.target.channel, feed.title
+            );
             let title = match entry.title {
                 Some(ref t) => t.content.to_owned(),
                 _ => "".to_owned(),
@@ -460,6 +475,8 @@ async fn refresh_feeds(sender: mpsc::Sender<BotAction>) {
             add_entry_to_db(&conn, &entry, feed.id);
         }
     }
+
+    info!("Feed refresh finished");
 }
 
 pub async fn rss_manager(sender: mpsc::Sender<BotAction>) {

@@ -5,10 +5,10 @@
 use futures::prelude::*;
 use irc::client::prelude::*;
 use log::{debug, error};
-use yaml_rust::yaml::Yaml;
 use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::mpsc;
+use yaml_rust::yaml::Yaml;
 
 use crate::botaction::{ActionType, BotAction};
 use crate::ClientQuery;
@@ -36,7 +36,7 @@ pub async fn irc_loop(
         let mut config = Config {
             ..Config::default()
         };
-        
+
         let network_name = match network["network"].as_str() {
             Some(name) => name.to_owned(),
             None => {
@@ -67,7 +67,7 @@ pub async fn irc_loop(
 
         if let Some(tls) = network["tls"].as_bool() {
             config.use_tls = Some(tls);
-        }  else {
+        } else {
             config.use_tls = Some(false);
         }
 

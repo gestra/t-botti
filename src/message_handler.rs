@@ -4,7 +4,7 @@
 
 use irc::client::prelude::*;
 
-use log::debug;
+use log::info;
 
 use regex::Regex;
 
@@ -68,17 +68,22 @@ async fn is_admin(
             return false;
         }
     };
+
     let (admin_tx, admin_rx) = oneshot::channel();
     clientquery_sender
         .send(ClientQuery::IsAdmin(
             admin_tx,
             network.to_owned(),
-            mask,
+            mask.to_owned(),
         ))
         .await
         .unwrap();
 
-    matches!(admin_rx.await, Ok(true))
+    let ret = matches!(admin_rx.await, Ok(true));
+
+    info!("Checking whether {} is admin on {}: {}", mask, network, ret);
+
+    ret
 }
 
 async fn handle_command(
@@ -99,6 +104,8 @@ async fn handle_command(
         None => (&message[1..], ""),
     };
 
+    info!("Command {} called by {:?}", command, prefix);
+
     match command {
         "echo" => {
             command_echo(bot_sender, source, params, prefix).await;
@@ -114,7 +121,6 @@ async fn handle_command(
         }
         "rss" => {
             if is_admin(clientquery_sender, prefix, &source.network).await {
-                debug!("Calling command_rss");
                 command_rss(bot_sender, source, params).await;
             }
         }

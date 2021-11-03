@@ -3,9 +3,9 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
 use irc::client::prelude::Prefix;
-use yaml_rust::yaml::Yaml;
 use std::sync::Arc;
 use tokio::sync::mpsc;
+use yaml_rust::yaml::Yaml;
 
 use crate::botaction::{ActionType, BotAction};
 use crate::http_client::HTTP_CLIENT;
