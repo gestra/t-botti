@@ -5,7 +5,7 @@
 use futures::prelude::*;
 use irc::client::prelude::*;
 use log::{debug, error};
-use yaml_rust::yaml;
+use yaml_rust::yaml::Yaml;
 use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::mpsc;
@@ -17,7 +17,7 @@ pub async fn irc_loop(
     input_channel: mpsc::Sender<(String, Message)>,
     mut output_channel: mpsc::Receiver<BotAction>,
     mut clientquery_receiver: mpsc::Receiver<ClientQuery>,
-    config: Arc<yaml::Yaml>,
+    config: Arc<Yaml>,
 ) {
     let (common_ircdata_tx, mut common_ircdata_rx) = mpsc::channel(100);
 

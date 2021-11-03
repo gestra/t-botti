@@ -12,7 +12,7 @@ use std::sync::Arc;
 
 use tokio::sync::{mpsc, oneshot};
 
-use yaml_rust::yaml;
+use yaml_rust::yaml::Yaml;
 
 use crate::botaction::{ActionType, BotAction};
 use crate::epic::command_epic;
@@ -77,10 +77,8 @@ async fn is_admin(
         ))
         .await
         .unwrap();
-    match admin_rx.await {
-        Ok(true) => true,
-        _ => false,
-    }
+
+    matches!(admin_rx.await, Ok(true))
 }
 
 async fn handle_command(
@@ -90,7 +88,7 @@ async fn handle_command(
     source: IrcChannel,
     message: &str,
     prefix: Option<Prefix>,
-    config: Arc<yaml::Yaml>,
+    config: Arc<Yaml>,
 ) {
     let (command, params) = match message[1..].find(char::is_whitespace) {
         Some(i) => {
@@ -156,7 +154,7 @@ pub async fn message_handler(
     sender: mpsc::Sender<BotAction>,
     timer_sender: mpsc::Sender<TimerEvent>,
     clientquery_sender: mpsc::Sender<ClientQuery>,
-    config: Arc<yaml::Yaml>,
+    config: Arc<Yaml>,
 ) {
     while let Some((network, message)) = receiver.recv().await {
         if let Command::PRIVMSG(channel, msg) = message.command {

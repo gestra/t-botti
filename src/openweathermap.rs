@@ -3,7 +3,7 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
 use irc::client::prelude::Prefix;
-use yaml_rust::yaml;
+use yaml_rust::yaml::Yaml;
 use std::sync::Arc;
 use tokio::sync::mpsc;
 
@@ -144,7 +144,7 @@ pub async fn command_openweathermap(
     source: IrcChannel,
     prefix: Option<Prefix>,
     params: &str,
-    config: Arc<yaml::Yaml>,
+    config: Arc<Yaml>,
 ) {
     let location = match params {
         "" => get_location(&prefix, &source.network),

@@ -4,7 +4,7 @@
 
 use tokio::sync::{mpsc, oneshot};
 
-use yaml_rust::{yaml, YamlLoader};
+use yaml_rust::yaml::{Yaml, YamlLoader};
 
 use std::fs::File;
 use std::io::prelude::*;
@@ -81,7 +81,7 @@ fn read_config_file() -> Result<String, ()> {
     }
 }
 
-fn get_config() -> Result<Vec<yaml::Yaml>, ()> {
+fn get_config() -> Result<Vec<Yaml>, ()> {
     let file = match read_config_file() {
         Ok(f) => f,
         Err(_) => {
