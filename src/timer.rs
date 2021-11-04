@@ -6,7 +6,7 @@ use chrono::{DateTime, Duration, NaiveDateTime, Utc};
 
 use irc::client::prelude::*;
 
-use log::{debug, error};
+use log::{debug, error, info};
 
 use regex::Regex;
 
@@ -287,7 +287,7 @@ fn remove_old_timers(conn: &rusqlite::Connection) -> rusqlite::Result<()> {
     let res = statement.execute(params);
     match res {
         Ok(n) => {
-            debug!("Removed {} old timers from db", n);
+            info!("Removed {} old timers from db", n);
         }
         Err(e) => {
             error!("Error removing old timers from db: {:?}", e);
@@ -394,6 +394,7 @@ pub async fn timer_manager(
         let _ = remove_old_timers(c);
 
         if let Ok(old_timers) = get_timers_from_db(c) {
+            info!("Adding {} old timers from db", old_timers.len());
             for (id, event) in old_timers {
                 let new_sender = sender.clone();
                 start_timer(event, new_sender, Some(id));
