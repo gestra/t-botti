@@ -6,7 +6,7 @@ use core::time::Duration;
 
 use feed_rs::parser;
 
-use log::{info, warn};
+use log::{debug, info, warn};
 
 use rusqlite::{named_params, params};
 
@@ -148,6 +148,9 @@ fn parse_feed(feed: &str, url: &str) -> parser::ParseFeedResult<FeedData> {
         Some(t) => t.content,
         None => "NoTitle".to_owned(),
     };
+
+    debug!("Parsed feed {}", url);
+    debug!("Entries: {:?}", feed.entries);
 
     Ok(FeedData {
         title,
@@ -464,6 +467,8 @@ async fn refresh_feeds(sender: mpsc::Sender<BotAction>) {
                 network: feed.target.network.to_owned(),
                 channel: feed.target.channel.to_owned(),
             };
+            debug!("Entry URL before format!: {}", entry.links[0].href);
+
             let msg = format!("[{}] {} <{}>", feed.title, title, entry.links[0].href);
             let _ = sender
                 .send(BotAction {
