@@ -36,7 +36,7 @@ pub async fn command_weatherset(
 pub fn open_db(testing: bool) -> Result<Connection> {
     let conn = match testing {
         true => rusqlite::Connection::open(":memory:")?,
-        false => rusqlite::Connection::open("weather_locations.db")?,
+        false => rusqlite::Connection::open("db/weather_locations.db")?,
     };
 
     conn.execute(
