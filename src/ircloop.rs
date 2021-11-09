@@ -13,6 +13,22 @@ use yaml_rust::yaml::Yaml;
 use crate::botaction::{ActionType, BotAction};
 use crate::ClientQuery;
 
+fn cut_msg_length(s: &str, max_len: usize) -> String {
+    if s.len() <= max_len {
+        return s.to_owned();
+    }
+
+    let mut out = String::new();
+    for c in s.chars() {
+        out.push(c);
+        if out.len() >= max_len {
+            break;
+        }
+    }
+
+    out
+}
+
 pub async fn irc_loop(
     input_channel: mpsc::Sender<(String, Message)>,
     mut output_channel: mpsc::Receiver<BotAction>,
@@ -116,8 +132,9 @@ pub async fn irc_loop(
                     Some(action) = network_input_rx.recv() => {
                         match action.action_type {
                             ActionType::Message(msg) => {
-                                debug!("sending PRIVMSG {}", msg);
-                                client.send_privmsg(action.target.channel, msg).unwrap();
+                                let out = cut_msg_length(&msg, 450);
+                                debug!("sending PRIVMSG {}", out);
+                                client.send_privmsg(action.target.channel, out).unwrap();
                             }
                             ActionType::Action(msg) => {
                                 debug!("sending ACTION {}", msg);
