@@ -14,3 +14,8 @@ wolfram_alpha:
 
 openweathermap:
   apikey: '123-ABC-789-XYZ'
+
+teamspeak3:
+  host: 'host'
+  serverquery_login: 'name'
+  serverquery_password: 'password'

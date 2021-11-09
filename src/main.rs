@@ -22,6 +22,7 @@ mod epic;
 mod fmi;
 mod h33h3;
 mod openweathermap;
+mod ts3;
 mod weather_db;
 mod wolfram_alpha;
 

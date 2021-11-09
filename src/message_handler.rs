@@ -22,6 +22,7 @@ use crate::openweathermap::command_openweathermap;
 use crate::roll::command_roll;
 use crate::rss::command_rss;
 use crate::timer::{command_bigone, command_pizza, command_timer, TimerEvent};
+use crate::ts3::command_ts;
 use crate::tvmaze::command_ep;
 use crate::urltitle::handle_url_titles;
 use crate::weather_db::command_weatherset;
@@ -150,6 +151,9 @@ async fn handle_command(
         }
         "epic" => {
             command_epic(bot_sender, source).await;
+        }
+        "ts" => {
+            command_ts(bot_sender, source, config).await;
         }
         _ => {}
     }
