@@ -167,12 +167,16 @@ pub async fn message_handler(
     config: Arc<Yaml>,
 ) {
     while let Some((network, message)) = receiver.recv().await {
-        if let Command::PRIVMSG(channel, msg) = message.command {
+        if let Command::PRIVMSG(_, msg) = &message.command {
             let msg_lower = msg.to_lowercase();
+            let channel = match message.response_target() {
+                Some(c) => c,
+                _ => { continue; }
+            };
 
             if RE_URL.is_match(&msg) {
                 let snd = sender.clone();
-                let msg_copy = String::from(&msg);
+                let msg_copy = String::from(msg);
                 let source = IrcChannel {
                     network: network.to_owned(),
                     channel: channel.to_owned(),
@@ -194,7 +198,7 @@ pub async fn message_handler(
                 let new_sender = sender.clone();
                 let new_timer_sender = timer_sender.clone();
                 let new_cq_sender = clientquery_sender.clone();
-                let msg_copy = String::from(&msg);
+                let msg_copy = String::from(msg);
                 let source = IrcChannel {
                     network: network.to_owned(),
                     channel: channel.to_owned(),
