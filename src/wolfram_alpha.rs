@@ -2,7 +2,7 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
-use log::error;
+use log::{debug, error};
 use std::sync::Arc;
 use tokio::sync::mpsc;
 use yaml_rust::yaml;
@@ -25,6 +25,10 @@ async fn get_xml(query: &str, appid: &str) -> reqwest::Result<String> {
     Ok(xml)
 }
 
+fn clean_plaintext(text: &str) -> String {
+    text.to_string().replace(" | ", ": ").replace("\n", " | ")
+}
+
 fn response_from_xml(xml: &str) -> Result<String, String> {
     let root = match xmltree::Element::parse(xml.as_bytes()) {
         Ok(r) => r,
@@ -41,20 +45,40 @@ fn response_from_xml(xml: &str) -> Result<String, String> {
     for c in root.children {
         if let xmltree::XMLNode::Element(e) = c {
             if e.name == "pod" {
+                debug!("e.name == 'pod'");
                 if let Some(title) = e.attributes.get("title") {
+                    debug!("Some(title) = {}", title);
                     if let Some(subpod) = e.get_child("subpod") {
+                        debug!("Some(subpod) = {:?}", subpod);
                         match title.as_str() {
                             "Input interpretation" => {
+                                debug!("Input interpretation");
                                 if let Some(i) = subpod.get_child("plaintext") {
+                                    debug!("Some(i) = {:?}", i);
                                     if let Some(text) = i.get_text() {
-                                        interpretation = Some(text.to_string());
+                                        interpretation = Some(clean_plaintext(&text));
+                                        debug!("Interpretation = {}", text);
+                                    }
+                                }
+                            }
+                            "Input information" => {
+                                debug!("Input information");
+                                if let Some(i) = subpod.get_child("plaintext") {
+                                    debug!("Some(i) = {:?}", i);
+                                    if let Some(text) = i.get_text() {
+                                        interpretation = Some(clean_plaintext(&text));
+                                        debug!("Interpretation = {}", text);
                                     }
                                 }
                             }
                             "Result" => {
+                                debug!("Result");
                                 if let Some(i) = subpod.get_child("plaintext") {
+                                    debug!("Some(i) = {:?}", i);
                                     if let Some(text) = i.get_text() {
-                                        answer = Some(text.to_string());
+                                        answer = Some(clean_plaintext(&text));
+
+                                        debug!("answer = {}", text);
                                         break;
                                     }
                                 }
@@ -76,6 +100,8 @@ fn response_from_xml(xml: &str) -> Result<String, String> {
 
     let msg = if interpretation.is_some() && answer.is_some() {
         format!("{} = {}", interpretation.unwrap(), answer.unwrap())
+    } else if answer.is_some() {
+        answer.unwrap()
     } else if didyoumean.is_some() {
         format!("Did you mean: {}", didyoumean.unwrap())
     } else {
