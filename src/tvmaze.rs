@@ -3,11 +3,20 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
 use chrono::prelude::*;
+use log::{debug, warn};
 use tokio::sync::mpsc;
 
 use crate::botaction::{ActionType, BotAction};
 use crate::http_client::HTTP_CLIENT;
 use crate::IrcChannel;
+
+#[derive(Debug)]
+enum ShowStatus {
+    Running,
+    Ended,
+    InDevelopment,
+    TBD,
+}
 
 #[derive(Debug)]
 struct ShowData {
@@ -16,7 +25,7 @@ struct ShowData {
     epairdate: Option<DateTime<FixedOffset>>,
     epseason: Option<i64>,
     epnumber: Option<i64>,
-    running: bool,
+    status: Option<ShowStatus>,
 }
 
 async fn get_json(showname: &str) -> reqwest::Result<String> {
@@ -39,7 +48,7 @@ fn parse_json(json_text: &str) -> Result<ShowData, String> {
     let mut epairdate = None;
     let mut epseason = None;
     let mut epnumber = None;
-    let mut running = false;
+    let mut status = None;
 
     let json: serde_json::Value = match serde_json::from_str(json_text) {
         Ok(j) => j,
@@ -57,43 +66,94 @@ fn parse_json(json_text: &str) -> Result<ShowData, String> {
     }
 
     if let Some(r) = json["status"].as_str() {
-        if r == "Running" {
-            running = true;
-        }
+        status = match r {
+            "Running" => Some(ShowStatus::Running),
+            "Ended" => Some(ShowStatus::Ended),
+            "In Development" => Some(ShowStatus::InDevelopment),
+            "To Be Determined" => Some(ShowStatus::TBD),
+            _ => {
+                warn!("Unknown status: {}", r);
+                None
+            },
+        };
     }
 
-    if let Some(eps) = json["_embedded"]["episodes"].as_array() {
-        if !running {
-            if let Some(lastep) = eps.last() {
-                if let Some(airstamp) = lastep["airstamp"].as_str() {
-                    if let Ok(dt) = DateTime::parse_from_rfc3339(airstamp) {
-                        epairdate = Some(dt);
-                    }
-                }
-                if let Some(name) = lastep["name"].as_str() {
-                    epname = Some(name.to_owned());
-                }
-                epseason = lastep["season"].as_i64();
-                epnumber = lastep["number"].as_i64();
-            }
-        } else {
-            let now: DateTime<Utc> = Utc::now();
-            for ep in eps {
-                if let Some(airstamp) = ep["airstamp"].as_str() {
-                    if let Ok(dt) = DateTime::parse_from_rfc3339(airstamp) {
-                        if dt > now {
-                            epairdate = Some(dt);
-                            if let Some(name) = ep["name"].as_str() {
-                                epname = Some(name.to_owned());
+    let now: DateTime<Utc> = Utc::now();
+
+    match status {
+        Some(ShowStatus::Running) => {
+            if let Some(eps) = json["_embedded"]["episodes"].as_array() {
+                for ep in eps {
+                    if let Some(airstamp) = ep["airstamp"].as_str() {
+                        if let Ok(dt) = DateTime::parse_from_rfc3339(airstamp) {
+                            if dt > now {
+                                epairdate = Some(dt);
+                                if let Some(name) = ep["name"].as_str() {
+                                    epname = Some(name.to_owned());
+                                }
+                                epseason = ep["season"].as_i64();
+                                epnumber = ep["number"].as_i64();
+                                break;
                             }
-                            epseason = ep["season"].as_i64();
-                            epnumber = ep["number"].as_i64();
-                            break;
                         }
                     }
                 }
             }
         }
+        Some(ShowStatus::Ended) => {
+            if let Some(eps) = json["_embedded"]["episodes"].as_array() {
+                if let Some(lastep) = eps.last() {
+                    if let Some(airstamp) = lastep["airstamp"].as_str() {
+                        if let Ok(dt) = DateTime::parse_from_rfc3339(airstamp) {
+                            epairdate = Some(dt);
+                        }
+                    }
+                    if let Some(name) = lastep["name"].as_str() {
+                        epname = Some(name.to_owned());
+                    }
+                    epseason = lastep["season"].as_i64();
+                    epnumber = lastep["number"].as_i64();
+                }
+            }
+        }
+        Some(ShowStatus::InDevelopment) => {
+            debug!("Show in development");
+            if let Some(eps) = json["_embedded"]["episodes"].as_array() {
+                if let Some(firstep) = eps.first() {
+                    if let Some(airstamp) = firstep["airstamp"].as_str() {
+                        if let Ok(dt) = DateTime::parse_from_rfc3339(airstamp) {
+                            epairdate = Some(dt);
+                            debug!("Airdate: {:?}", epairdate);
+                        }
+                    }
+                    if let Some(name) = firstep["name"].as_str() {
+                        epname = Some(name.to_owned());
+                        debug!("Episode name: {:?}", epname);
+                    }
+                    epseason = firstep["season"].as_i64();
+                    debug!("Episode season: {:?}", epseason);
+                    epnumber = firstep["number"].as_i64();
+                    debug!("Episode number: {:?}", epnumber);
+                }
+            }
+        }
+        Some(ShowStatus::TBD) => {
+            if let Some(eps) = json["_embedded"]["episodes"].as_array() {
+                if let Some(lastep) = eps.last() {
+                    if let Some(airstamp) = lastep["airstamp"].as_str() {
+                        if let Ok(dt) = DateTime::parse_from_rfc3339(airstamp) {
+                            epairdate = Some(dt);
+                        }
+                    }
+                    if let Some(name) = lastep["name"].as_str() {
+                        epname = Some(name.to_owned());
+                    }
+                    epseason = lastep["season"].as_i64();
+                    epnumber = lastep["number"].as_i64();
+                }
+            }
+        }
+        None => {}
     }
 
     Ok(ShowData {
@@ -102,49 +162,89 @@ fn parse_json(json_text: &str) -> Result<ShowData, String> {
         epairdate,
         epseason,
         epnumber,
-        running,
+        status,
     })
 }
 
 fn generate_msg(data: ShowData) -> String {
     let msg;
 
-    if data.running {
-        if data.epairdate.is_some() {
-            let date = data.epairdate.unwrap();
-            let datefmt = format!("{}-{}-{}", date.year(), date.month(), date.day());
-            if data.epseason.is_some() && data.epnumber.is_some() && data.epname.is_some() {
-                msg = format!(
-                    "Next episode of {} {}x{} '{}' airs on {}",
-                    data.showname,
-                    data.epseason.unwrap(),
-                    data.epnumber.unwrap(),
-                    data.epname.unwrap(),
-                    datefmt,
-                );
+    match data.status {
+        Some(ShowStatus::Running) => {
+            if data.epairdate.is_some() {
+                let date = data.epairdate.unwrap();
+                let datefmt = format!("{}-{}-{}", date.year(), date.month(), date.day());
+                if data.epseason.is_some() && data.epnumber.is_some() && data.epname.is_some() {
+                    msg = format!(
+                        "Next episode of {} {}x{} '{}' airs on {}",
+                        data.showname,
+                        data.epseason.unwrap(),
+                        data.epnumber.unwrap(),
+                        data.epname.unwrap(),
+                        datefmt,
+                    );
+                } else {
+                    msg = format!("Next episode of {} airs on {}", data.showname, datefmt,);
+                }
             } else {
-                msg = format!("Next episode of {} airs on {}", data.showname, datefmt,);
+                msg = format!("No airdate found for next episode of {}", data.showname);
             }
-        } else {
-            msg = format!("No airdate found for next episode of {}", data.showname);
         }
-    } else if data.epairdate.is_some() {
-        let date = data.epairdate.unwrap();
-        let datefmt = format!("{}-{:02}-{:02}", date.year(), date.month(), date.day());
+        Some(ShowStatus::Ended) => {
+            if data.epairdate.is_some() {
+                let date = data.epairdate.unwrap();
+                let datefmt = format!("{}-{:02}-{:02}", date.year(), date.month(), date.day());
 
-        if data.epname.is_some() && data.epnumber.is_some() && data.epseason.is_some() {
-            let name = data.epname.unwrap();
-            let epnum = data.epnumber.unwrap();
-            let epseason = data.epseason.unwrap();
-            msg = format!(
-                "Last episode of {} {}x{} '{}' aired on {}",
-                data.showname, epseason, epnum, name, datefmt
-            );
-        } else {
-            msg = format!("{} ended on {}", data.showname, datefmt);
+                if data.epname.is_some() && data.epnumber.is_some() && data.epseason.is_some() {
+                    let name = data.epname.unwrap();
+                    let epnum = data.epnumber.unwrap();
+                    let epseason = data.epseason.unwrap();
+                    msg = format!(
+                        "Last episode of {} {}x{} '{}' aired on {}",
+                        data.showname, epseason, epnum, name, datefmt
+                    );
+                } else {
+                    msg = format!("{} ended on {}", data.showname, datefmt);
+                }
+            } else {
+                msg = format!("{} has ended", data.showname);
+            }
         }
-    } else {
-        msg = format!("{} has ended", data.showname);
+        Some(ShowStatus::InDevelopment) => {
+            if data.epairdate.is_some() {
+                let date = data.epairdate.unwrap();
+                let datefmt = format!("{}-{:02}-{:02}", date.year(), date.month(), date.day());
+                msg = format!("{} will premiere on {}", data.showname, datefmt);
+            } else {
+                msg = format!("{} is in development", data.showname);
+            }
+        }
+        Some(ShowStatus::TBD) => {
+            if let Some(date) = data.epairdate {
+                let datefmt = format!("{}-{:02}-{:02}", date.year(), date.month(), date.day());
+                if data.epname.is_some() && data.epnumber.is_some() && data.epseason.is_some() {
+                    msg = format!(
+                        "Status of {} is unknown. Last episode {}x{} '{}' aired on {}",
+                        data.showname,
+                        data.epseason.unwrap(),
+                        data.epnumber.unwrap(),
+                        data.epname.unwrap(),
+                        datefmt,
+                    );
+                } else {
+                    msg = format!(
+                        "Status of {} is unknown. Last episode aired on {}",
+                        data.showname,
+                        datefmt,
+                    );
+                }
+            } else {
+                msg = format!("Status of {} is unknown", data.showname);
+            }
+        }
+        None => {
+                msg = format!("Status of {} is unknown", data.showname);
+        }
     }
 
     msg
