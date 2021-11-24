@@ -173,7 +173,7 @@ fn generate_msg(data: ShowData) -> String {
         Some(ShowStatus::Running) => {
             if data.epairdate.is_some() {
                 let date = data.epairdate.unwrap();
-                let datefmt = format!("{}-{}-{}", date.year(), date.month(), date.day());
+                let datefmt = format!("{}-{:02}-{:02}", date.year(), date.month(), date.day());
                 if data.epseason.is_some() && data.epnumber.is_some() && data.epname.is_some() {
                     msg = format!(
                         "Next episode of {} {}x{} '{}' airs on {}",
