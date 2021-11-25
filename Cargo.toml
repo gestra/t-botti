@@ -10,7 +10,7 @@ license = "MPL-2.0"
 [dependencies]
 irc = "0.15"
 futures = "0.3"
-tokio = { version = "1.12", features = ["full"] }
+tokio = { version = "1.14", features = ["full"] }
 regex = "1.5"
 lazy_static = "1.4"
 chrono = "0.4"
