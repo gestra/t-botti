@@ -231,6 +231,20 @@ pub async fn message_handler(
                     });
                 }
             }
+
+            if msg_lower.contains("matt damon") {
+                let s = sender.clone();
+                let source = IrcChannel {
+                    network: network.to_owned(),
+                    channel: channel.to_owned(),
+                };
+                let mattdamon = "MATT DAMON".to_owned();
+                let action = BotAction {
+                    action_type: ActionType::Message(mattdamon),
+                    target: source,
+                };
+                let _ = s.send(action).await;
+            }
         }
     }
 }
