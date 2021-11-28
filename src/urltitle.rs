@@ -25,6 +25,8 @@ async fn title_from_url(url: &str) -> Option<String> {
     lazy_static! {
         static ref RE_TWITTER_URL: Regex =
             Regex::new(r"https?://(?:mobile\.)?twitter\.com/[^/]+/status/(?P<id>\d+)/?.*").unwrap();
+        static ref RE_WIKIPEDIA_URL: Regex =
+            Regex::new(r"https?://(?P<lang>..)\.wikipedia.org/wiki/(?P<title>[^/]+)").unwrap();
     }
 
     if RE_TWITTER_URL.is_match(url) {
@@ -32,6 +34,13 @@ async fn title_from_url(url: &str) -> Option<String> {
         let id = caps.name("id")?.as_str();
         debug!("Looks like a Twitter URL");
         return parse_twitter(id).await;
+    }
+    if RE_WIKIPEDIA_URL.is_match(url) {
+        let caps = RE_WIKIPEDIA_URL.captures(url)?;
+        let title = caps.name("title")?.as_str();
+        let lang = caps.name("lang")?.as_str();
+        debug!("Looks like a Wikipedia URL");
+        return parse_wikipedia(lang, title).await;
     }
 
     let resp = match HTTP_CLIENT.get(url).send().await {
@@ -138,6 +147,14 @@ pub async fn handle_url_titles(sender: mpsc::Sender<BotAction>, source: IrcChann
         tokio::spawn(async move {
             send_title(s, src, &url).await;
         });
+    }
+}
+
+async fn parse_wikipedia(lang: &str, title: &str) -> Option<String> {
+    if let Ok(summary) = crate::wikipedia::get_summary(lang, title).await {
+        Some(format!("Title: {}", summary))
+    } else {
+        None
     }
 }
 
@@ -322,7 +339,7 @@ mod tests {
     #[tokio::test]
     async fn urltitle_wikipedia() {
         let url = "https://en.wikipedia.org/wiki/Koro_(medicine)";
-        let expected_title = "Title: Koro (medicine) - Wikipedia".to_string();
+        let expected_title = "Title: Koro is a culture bound delusional disorder in which an individual has an overpowering belief that their sex organs are retracting and will disappear, despite the lack of any true longstanding changes to the genitals.  Koro is also known as shrinking penis, and it is listed in the Diagnostic and Statistical Manual of Mental Disorders. / The syndrome occurs worldwide, and mass hysteria of genital-shrinkage anxiety has a history in Africa, Asia and Europe.".to_string();
         let title = title_from_url(url).await;
 
         assert_eq!(title, Some(expected_title));

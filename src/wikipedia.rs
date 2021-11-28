@@ -74,7 +74,7 @@ async fn get_summary_json(title: &str, lang: &str) -> reqwest::Result<String> {
     Ok(json)
 }
 
-async fn get_summary(lang: &str, title: &str) -> Result<String, String> {
+pub async fn get_summary(lang: &str, title: &str) -> Result<String, String> {
     if let Ok(json_text) = get_summary_json(title, lang).await {
         let json: serde_json::Value = match serde_json::from_str(&json_text) {
             Ok(j) => j,
