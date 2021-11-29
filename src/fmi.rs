@@ -1121,12 +1121,12 @@ mod tests {
         assert_eq!(parsed.temperature, Some("-1.3".to_owned()));
         assert_eq!(parsed.wind, Some("6.5".to_owned()));
         assert_eq!(parsed.gust, Some("9.0".to_owned()));
-        assert_eq!(parsed.feels_like, Some("-5.9".to_owned()));
+        assert_eq!(parsed.feels_like, Some("-7.4".to_owned()));
         assert_eq!(parsed.humidity, Some("96".to_owned()));
         assert_eq!(parsed.cloudiness, Some("8".to_owned()));
         assert_eq!(parsed.wawa, Some("jäätävää heikkoa vesisadetta".to_owned()));
 
         let msg = generate_msg(parsed);
-        assert_eq!(msg, "Helsinki Kaisaniemi: lämpötila: -1.3°C, tuntuu kuin: -5.9°C, tuulen nopeus: 6.5m/s, puuskat: 9.0m/s, ilman kosteus: 96%, pilvisyys: 8/8, jäätävää heikkoa vesisadetta");
+        assert_eq!(msg, "Helsinki Kaisaniemi: lämpötila: -1.3°C, tuntuu kuin: -7.4°C, tuulen nopeus: 6.5m/s, puuskat: 9.0m/s, ilman kosteus: 96%, pilvisyys: 8/8, jäätävää heikkoa vesisadetta");
     }
 }
