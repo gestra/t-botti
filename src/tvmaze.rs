@@ -15,7 +15,7 @@ enum ShowStatus {
     Running,
     Ended,
     InDevelopment,
-    TBD,
+    Tbd,
 }
 
 #[derive(Debug)]
@@ -70,11 +70,11 @@ fn parse_json(json_text: &str) -> Result<ShowData, String> {
             "Running" => Some(ShowStatus::Running),
             "Ended" => Some(ShowStatus::Ended),
             "In Development" => Some(ShowStatus::InDevelopment),
-            "To Be Determined" => Some(ShowStatus::TBD),
+            "To Be Determined" => Some(ShowStatus::Tbd),
             _ => {
                 warn!("Unknown status: {}", r);
                 None
-            },
+            }
         };
     }
 
@@ -137,7 +137,7 @@ fn parse_json(json_text: &str) -> Result<ShowData, String> {
                 }
             }
         }
-        Some(ShowStatus::TBD) => {
+        Some(ShowStatus::Tbd) => {
             if let Some(eps) = json["_embedded"]["episodes"].as_array() {
                 if let Some(lastep) = eps.last() {
                     if let Some(airstamp) = lastep["airstamp"].as_str() {
@@ -219,7 +219,7 @@ fn generate_msg(data: ShowData) -> String {
                 msg = format!("{} is in development", data.showname);
             }
         }
-        Some(ShowStatus::TBD) => {
+        Some(ShowStatus::Tbd) => {
             if let Some(date) = data.epairdate {
                 let datefmt = format!("{}-{:02}-{:02}", date.year(), date.month(), date.day());
                 if data.epname.is_some() && data.epnumber.is_some() && data.epseason.is_some() {
@@ -234,8 +234,7 @@ fn generate_msg(data: ShowData) -> String {
                 } else {
                     msg = format!(
                         "Status of {} is unknown. Last episode aired on {}",
-                        data.showname,
-                        datefmt,
+                        data.showname, datefmt,
                     );
                 }
             } else {
@@ -243,7 +242,7 @@ fn generate_msg(data: ShowData) -> String {
             }
         }
         None => {
-                msg = format!("Status of {} is unknown", data.showname);
+            msg = format!("Status of {} is unknown", data.showname);
         }
     }
 

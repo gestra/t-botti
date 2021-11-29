@@ -175,10 +175,12 @@ pub async fn message_handler(
             let msg_lower = msg.to_lowercase();
             let channel = match message.response_target() {
                 Some(c) => c,
-                _ => { continue; }
+                _ => {
+                    continue;
+                }
             };
 
-            if RE_URL.is_match(&msg) {
+            if RE_URL.is_match(msg) {
                 let snd = sender.clone();
                 let msg_copy = String::from(msg);
                 let source = IrcChannel {

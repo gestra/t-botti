@@ -125,7 +125,8 @@ fn parse_xml(xml: &str) -> Result<WeatherData, String> {
 
     fn calc_feels_like(temperature: f64, wind: f64) -> f64 {
         // https://fi.wikipedia.org/wiki/Pakkasen_purevuus#Uusi_kaava
-        13.12 + 0.6215 * temperature - 13.956 * wind.powf(0.16) + 0.4867 * temperature * wind.powf(0.16)
+        13.12 + 0.6215 * temperature - 13.956 * wind.powf(0.16)
+            + 0.4867 * temperature * wind.powf(0.16)
     }
 
     let root = match xmltree::Element::parse(xml.as_bytes()) {

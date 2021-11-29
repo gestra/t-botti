@@ -31,10 +31,10 @@ async fn coordinates(place: &str) -> Result<String, ()> {
     };
 
     let json: serde_json::Value = match serde_json::from_str(&json_text) {
-         Ok(j) => j,
-         Err(_) => {
-             return Err(());
-         }
+        Ok(j) => j,
+        Err(_) => {
+            return Err(());
+        }
     };
 
     if let Some(lat) = json[0]["lat"].as_str() {
@@ -46,7 +46,6 @@ async fn coordinates(place: &str) -> Result<String, ()> {
     Err(())
 }
 
-
 pub async fn command_ukkostutka(
     bot_sender: mpsc::Sender<BotAction>,
     source: IrcChannel,
@@ -54,7 +53,7 @@ pub async fn command_ukkostutka(
 ) {
     let mut coords = "5.47/62.79/25.728".to_owned();
 
-    if params.len() > 0 {
+    if !params.is_empty() {
         if let Ok(c) = coordinates(params).await {
             coords = c;
         }
