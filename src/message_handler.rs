@@ -14,6 +14,7 @@ use tokio::sync::{mpsc, oneshot};
 
 use yaml_rust::yaml::Yaml;
 
+use crate::blitzortung::command_ukkostutka;
 use crate::botaction::{ActionType, BotAction};
 use crate::epic::command_epic;
 use crate::fmi::command_fmi;
@@ -154,6 +155,9 @@ async fn handle_command(
         }
         "ts" => {
             command_ts(bot_sender, source, config).await;
+        }
+        "ukkostutka" | "blitzortung" => {
+            command_ukkostutka(bot_sender, source, params).await;
         }
         _ => {}
     }

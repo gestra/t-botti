@@ -18,6 +18,7 @@ extern crate lazy_static;
 
 mod botaction;
 
+mod blitzortung;
 mod epic;
 mod fmi;
 mod h33h3;
