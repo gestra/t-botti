@@ -503,7 +503,6 @@ mod tests {
 
     #[derive(Debug)]
     struct FeedEntry {
-        feed_id: i64,
         url: String,
         title: String,
     }
@@ -521,7 +520,6 @@ mod tests {
             let title = row.get(2)?;
 
             entries.push(FeedEntry {
-                feed_id,
                 url,
                 title,
             });
