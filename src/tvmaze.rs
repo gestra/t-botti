@@ -3,7 +3,7 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
 use chrono::prelude::*;
-use log::{debug, warn};
+use log::{debug, error, warn};
 use tokio::sync::mpsc;
 
 use crate::botaction::{ActionType, BotAction};
@@ -174,14 +174,32 @@ fn generate_msg(data: ShowData) -> String {
             if data.epairdate.is_some() {
                 let date = data.epairdate.unwrap();
                 let datefmt = format!("{}-{:02}-{:02}", date.year(), date.month(), date.day());
+
+                let from_now = {
+                    let today = Local::now();
+                    let dur = date.signed_duration_since(today);
+                    let days = dur.num_days();
+
+                    match days {
+                        0 => ", today".to_string(),
+                        1 => ", tomorrow".to_string(),
+                        2.. => format!(", {} days from now", days),
+                        _ => {
+                            error!("Time until episode airdate was negative");
+                            "".to_string()
+                        }
+                    }
+                };
+
                 if data.epseason.is_some() && data.epnumber.is_some() && data.epname.is_some() {
                     msg = format!(
-                        "Next episode of {} {}x{} '{}' airs on {}",
+                        "Next episode of {} {}x{} '{}' airs on {}{}",
                         data.showname,
                         data.epseason.unwrap(),
                         data.epnumber.unwrap(),
                         data.epname.unwrap(),
                         datefmt,
+                        from_now,
                     );
                 } else {
                     msg = format!("Next episode of {} airs on {}", data.showname, datefmt,);
@@ -214,7 +232,22 @@ fn generate_msg(data: ShowData) -> String {
             if data.epairdate.is_some() {
                 let date = data.epairdate.unwrap();
                 let datefmt = format!("{}-{:02}-{:02}", date.year(), date.month(), date.day());
-                msg = format!("{} will premiere on {}", data.showname, datefmt);
+                let from_now = {
+                    let today = Local::now();
+                    let dur = date.signed_duration_since(today);
+                    let days = dur.num_days();
+
+                    match days {
+                        0 => ", today".to_string(),
+                        1 => ", tomorrow".to_string(),
+                        2.. => format!(", {} days from now", days),
+                        _ => {
+                            error!("Time until episode airdate was negative");
+                            "".to_string()
+                        }
+                    }
+                };
+                msg = format!("{} will premiere on {}{}", data.showname, datefmt, from_now);
             } else {
                 msg = format!("{} is in development", data.showname);
             }
