@@ -225,9 +225,9 @@ pub async fn parse_twitter(id: &str) -> Option<String> {
         } else if diff.num_days() >= 1 {
             approx = format!("{}d", diff.num_days());
         } else if diff.num_hours() >= 1 {
-            approx = format!("{}d", diff.num_hours());
+            approx = format!("{}h", diff.num_hours());
         } else {
-            approx = format!("{}d", diff.num_minutes());
+            approx = format!("{}min", diff.num_minutes());
         }
 
         approx
