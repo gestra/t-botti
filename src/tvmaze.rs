@@ -194,8 +194,8 @@ fn parse_json(json_text: &str) -> Result<ShowData, String> {
 
 fn generate_msg(data: ShowData) -> String {
     fn time_from_last_ep(dt: DateTime<FixedOffset>) -> String {
-        let today = Local::now();
-        let dur = dt.signed_duration_since(today);
+        let today = Local::now().date();
+        let dur = dt.date().signed_duration_since(today);
         let days = -dur.num_days();
         match days {
             0 => ", today".to_string(),
@@ -210,10 +210,9 @@ fn generate_msg(data: ShowData) -> String {
         }
     }
     fn time_until_next_ep(dt: DateTime<FixedOffset>) -> String {
-        let today = Local::now();
-        let dur = dt.signed_duration_since(today);
+        let today = Local::now().date();
+        let dur = dt.date().signed_duration_since(today);
         let days = dur.num_days();
-
         match days {
             0 => ", today".to_string(),
             1 => ", tomorrow".to_string(),
