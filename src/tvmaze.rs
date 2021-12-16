@@ -276,6 +276,7 @@ fn generate_msg(data: ShowData) -> String {
         Some(ShowStatus::Ended) => {
             if let Some(date) = data.lastepairdate {
                 let datefmt = format!("{}-{:02}-{:02}", date.year(), date.month(), date.day());
+                let from_now = time_from_last_ep(date);
 
                 if data.lastepname.is_some()
                     && data.lastepnumber.is_some()
@@ -284,13 +285,12 @@ fn generate_msg(data: ShowData) -> String {
                     let name = data.lastepname.unwrap();
                     let epnum = data.lastepnumber.unwrap();
                     let epseason = data.lastepseason.unwrap();
-                    let from_now = time_from_last_ep(date);
                     msg = format!(
                         "Last episode of {} {}x{} '{}' aired on {}{}",
                         data.showname, epseason, epnum, name, datefmt, from_now
                     );
                 } else {
-                    msg = format!("{} ended on {}", data.showname, datefmt);
+                    msg = format!("{} ended on {}{}", data.showname, datefmt, from_now);
                 }
             } else {
                 msg = format!("{} has ended", data.showname);
