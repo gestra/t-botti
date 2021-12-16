@@ -22,9 +22,13 @@ enum ShowStatus {
 struct ShowData {
     showname: String,
     epname: Option<String>,
+    lastepname: Option<String>,
     epairdate: Option<DateTime<FixedOffset>>,
+    lastepairdate: Option<DateTime<FixedOffset>>,
     epseason: Option<i64>,
     epnumber: Option<i64>,
+    lastepseason: Option<i64>,
+    lastepnumber: Option<i64>,
     status: Option<ShowStatus>,
 }
 
@@ -45,9 +49,13 @@ async fn get_json(showname: &str) -> reqwest::Result<String> {
 fn parse_json(json_text: &str) -> Result<ShowData, String> {
     let mut showname = String::new();
     let mut epname = None;
+    let mut lastepname = None;
     let mut epairdate = None;
+    let mut lastepairdate = None;
     let mut epseason = None;
     let mut epnumber = None;
+    let mut lastepseason = None;
+    let mut lastepnumber = None;
     let mut status = None;
 
     let json: serde_json::Value = match serde_json::from_str(json_text) {
@@ -98,6 +106,20 @@ fn parse_json(json_text: &str) -> Result<ShowData, String> {
                         }
                     }
                 }
+                if epairdate.is_none() {
+                    if let Some(lastep) = eps.last() {
+                        if let Some(airstamp) = lastep["airstamp"].as_str() {
+                            if let Ok(dt) = DateTime::parse_from_rfc3339(airstamp) {
+                                lastepairdate = Some(dt);
+                                if let Some(name) = lastep["name"].as_str() {
+                                    lastepname = Some(name.to_owned());
+                                }
+                                lastepseason = lastep["season"].as_i64();
+                                lastepnumber = lastep["number"].as_i64();
+                            }
+                        }
+                    }
+                }
             }
         }
         Some(ShowStatus::Ended) => {
@@ -105,14 +127,14 @@ fn parse_json(json_text: &str) -> Result<ShowData, String> {
                 if let Some(lastep) = eps.last() {
                     if let Some(airstamp) = lastep["airstamp"].as_str() {
                         if let Ok(dt) = DateTime::parse_from_rfc3339(airstamp) {
-                            epairdate = Some(dt);
+                            lastepairdate = Some(dt);
                         }
                     }
                     if let Some(name) = lastep["name"].as_str() {
-                        epname = Some(name.to_owned());
+                        lastepname = Some(name.to_owned());
                     }
-                    epseason = lastep["season"].as_i64();
-                    epnumber = lastep["number"].as_i64();
+                    lastepseason = lastep["season"].as_i64();
+                    lastepnumber = lastep["number"].as_i64();
                 }
             }
         }
@@ -159,14 +181,50 @@ fn parse_json(json_text: &str) -> Result<ShowData, String> {
     Ok(ShowData {
         showname,
         epname,
+        lastepname,
         epairdate,
+        lastepairdate,
         epseason,
         epnumber,
+        lastepseason,
+        lastepnumber,
         status,
     })
 }
 
 fn generate_msg(data: ShowData) -> String {
+    fn time_from_last_ep(dt: DateTime<FixedOffset>) -> String {
+        let today = Local::now();
+        let dur = dt.signed_duration_since(today);
+        let days = -dur.num_days();
+        match days {
+            0 => ", today".to_string(),
+            1 => ", yesterday".to_string(),
+            2..=364 => format!(", {} days ago", days),
+            365..=729 => ", 1 year ago".to_string(),
+            730.. => format!(", {} years ago", days / 365),
+            _ => {
+                error!("Days since episode airing was positive");
+                "".to_string()
+            }
+        }
+    }
+    fn time_until_next_ep(dt: DateTime<FixedOffset>) -> String {
+        let today = Local::now();
+        let dur = dt.signed_duration_since(today);
+        let days = dur.num_days();
+
+        match days {
+            0 => ", today".to_string(),
+            1 => ", tomorrow".to_string(),
+            2.. => format!(", {} days from now", days),
+            _ => {
+                error!("Time until episode airdate was negative");
+                "".to_string()
+            }
+        }
+    }
+
     let msg;
 
     match data.status {
@@ -174,22 +232,7 @@ fn generate_msg(data: ShowData) -> String {
             if data.epairdate.is_some() {
                 let date = data.epairdate.unwrap();
                 let datefmt = format!("{}-{:02}-{:02}", date.year(), date.month(), date.day());
-
-                let from_now = {
-                    let today = Local::now();
-                    let dur = date.signed_duration_since(today);
-                    let days = dur.num_days();
-
-                    match days {
-                        0 => ", today".to_string(),
-                        1 => ", tomorrow".to_string(),
-                        2.. => format!(", {} days from now", days),
-                        _ => {
-                            error!("Time until episode airdate was negative");
-                            "".to_string()
-                        }
-                    }
-                };
+                let from_now = time_until_next_ep(date);
 
                 if data.epseason.is_some() && data.epnumber.is_some() && data.epname.is_some() {
                     msg = format!(
@@ -204,22 +247,47 @@ fn generate_msg(data: ShowData) -> String {
                 } else {
                     msg = format!("Next episode of {} airs on {}", data.showname, datefmt,);
                 }
+            } else if data.lastepname.is_some()
+                && data.lastepnumber.is_some()
+                && data.lastepseason.is_some()
+                && data.lastepairdate.is_some()
+            {
+                let airdate = data.lastepairdate.unwrap();
+                let datefmt = format!(
+                    "{}-{:02}-{:02}",
+                    airdate.year(),
+                    airdate.month(),
+                    airdate.day()
+                );
+                let from_now = time_from_last_ep(airdate);
+                msg = format!(
+                    "No airdate found for next episode of {}. Last episode {}x{} '{}' aired on {}{}",
+                    data.showname,
+                    data.lastepseason.unwrap(),
+                    data.lastepnumber.unwrap(),
+                    data.lastepname.unwrap(),
+                    datefmt,
+                    from_now,
+                );
             } else {
                 msg = format!("No airdate found for next episode of {}", data.showname);
             }
         }
         Some(ShowStatus::Ended) => {
-            if data.epairdate.is_some() {
-                let date = data.epairdate.unwrap();
+            if let Some(date) = data.lastepairdate {
                 let datefmt = format!("{}-{:02}-{:02}", date.year(), date.month(), date.day());
 
-                if data.epname.is_some() && data.epnumber.is_some() && data.epseason.is_some() {
-                    let name = data.epname.unwrap();
-                    let epnum = data.epnumber.unwrap();
-                    let epseason = data.epseason.unwrap();
+                if data.lastepname.is_some()
+                    && data.lastepnumber.is_some()
+                    && data.lastepseason.is_some()
+                {
+                    let name = data.lastepname.unwrap();
+                    let epnum = data.lastepnumber.unwrap();
+                    let epseason = data.lastepseason.unwrap();
+                    let from_now = time_from_last_ep(date);
                     msg = format!(
-                        "Last episode of {} {}x{} '{}' aired on {}",
-                        data.showname, epseason, epnum, name, datefmt
+                        "Last episode of {} {}x{} '{}' aired on {}{}",
+                        data.showname, epseason, epnum, name, datefmt, from_now
                     );
                 } else {
                     msg = format!("{} ended on {}", data.showname, datefmt);
@@ -232,21 +300,7 @@ fn generate_msg(data: ShowData) -> String {
             if data.epairdate.is_some() {
                 let date = data.epairdate.unwrap();
                 let datefmt = format!("{}-{:02}-{:02}", date.year(), date.month(), date.day());
-                let from_now = {
-                    let today = Local::now();
-                    let dur = date.signed_duration_since(today);
-                    let days = dur.num_days();
-
-                    match days {
-                        0 => ", today".to_string(),
-                        1 => ", tomorrow".to_string(),
-                        2.. => format!(", {} days from now", days),
-                        _ => {
-                            error!("Time until episode airdate was negative");
-                            "".to_string()
-                        }
-                    }
-                };
+                let from_now = time_until_next_ep(date);
                 msg = format!("{} will premiere on {}{}", data.showname, datefmt, from_now);
             } else {
                 msg = format!("{} is in development", data.showname);
@@ -255,19 +309,21 @@ fn generate_msg(data: ShowData) -> String {
         Some(ShowStatus::Tbd) => {
             if let Some(date) = data.epairdate {
                 let datefmt = format!("{}-{:02}-{:02}", date.year(), date.month(), date.day());
+                let from_now = time_from_last_ep(date);
                 if data.epname.is_some() && data.epnumber.is_some() && data.epseason.is_some() {
                     msg = format!(
-                        "Status of {} is unknown. Last episode {}x{} '{}' aired on {}",
+                        "Status of {} is unknown. Last episode {}x{} '{}' aired on {}{}",
                         data.showname,
                         data.epseason.unwrap(),
                         data.epnumber.unwrap(),
                         data.epname.unwrap(),
                         datefmt,
+                        from_now,
                     );
                 } else {
                     msg = format!(
-                        "Status of {} is unknown. Last episode aired on {}",
-                        data.showname, datefmt,
+                        "Status of {} is unknown. Last episode aired on {}{}",
+                        data.showname, datefmt, from_now
                     );
                 }
             } else {
