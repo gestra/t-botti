@@ -26,7 +26,7 @@ async fn get_xml(query: &str, appid: &str) -> reqwest::Result<String> {
 }
 
 fn clean_plaintext(text: &str) -> String {
-    text.to_string().replace(" | ", ": ").replace("\n", " | ")
+    text.to_string().replace(" | ", ": ").replace("\n", " | ").trim().to_owned()
 }
 
 fn response_from_xml(xml: &str) -> Result<String, String> {
@@ -46,12 +46,12 @@ fn response_from_xml(xml: &str) -> Result<String, String> {
         if let xmltree::XMLNode::Element(e) = c {
             if e.name == "pod" {
                 debug!("e.name == 'pod'");
-                if let Some(title) = e.attributes.get("title") {
-                    debug!("Some(title) = {}", title);
+                if let Some(id) = e.attributes.get("id") {
+                    debug!("Some(id) = {}", id);
                     if let Some(subpod) = e.get_child("subpod") {
                         debug!("Some(subpod) = {:?}", subpod);
-                        match title.as_str() {
-                            "Input interpretation" => {
+                        match id.as_str() {
+                            "Input" => {
                                 debug!("Input interpretation");
                                 if let Some(i) = subpod.get_child("plaintext") {
                                     debug!("Some(i) = {:?}", i);
