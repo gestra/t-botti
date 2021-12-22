@@ -223,7 +223,7 @@ fn parse_xml(xml: &str) -> Result<WeatherData, String> {
             if let Ok(t_f) = t.parse::<f64>() {
                 if t_f <= 10.0 {
                     if let Ok(w_f) = w.parse::<f64>() {
-                        if w_f != 0.0 {
+                        if w_f > 0.01 {
                             let f = calc_feels_like(t_f, w_f);
                             feels_like = Some(format!("{:.1}", f));
                         }
