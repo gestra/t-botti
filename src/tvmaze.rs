@@ -46,7 +46,7 @@ async fn get_json(showname: &str) -> reqwest::Result<String> {
     Ok(json)
 }
 
-fn parse_json(json_text: &str) -> Result<ShowData, String> {
+async fn parse_json(json_text: &str) -> Result<ShowData, String> {
     let mut showname = String::new();
     let mut epname = None;
     let mut lastepname = None;
@@ -87,6 +87,44 @@ fn parse_json(json_text: &str) -> Result<ShowData, String> {
     }
 
     let now: DateTime<Utc> = Utc::now();
+
+    async fn get_url(url: &str) -> reqwest::Result<String> {
+        let j = HTTP_CLIENT.get(url).send().await?.text().await?;
+        Ok(j)
+    }
+
+    if let Some(nextepurl) = json["_links"]["nextepisode"]["href"].as_str() {
+        if let Ok(nextepjson) = get_url(nextepurl).await {
+            let nextj: serde_json::Value = match serde_json::from_str(&nextepjson) {
+                Ok(j) => j,
+                Err(_) => {
+                    return Err("Error parsing JSON".to_owned());
+                }
+            };
+            if let Some(airstamp) = nextj["airstamp"].as_str() {
+                if let Ok(dt) = DateTime::parse_from_rfc3339(airstamp) {
+                    epairdate = Some(dt);
+                    if let Some(name) = nextj["name"].as_str() {
+                        epname = Some(name.to_owned());
+                    }
+                    epseason = nextj["season"].as_i64();
+                    epnumber = nextj["number"].as_i64();
+                    return Ok(ShowData {
+                        showname,
+                        epname,
+                        lastepname,
+                        epairdate,
+                        lastepairdate,
+                        epseason,
+                        epnumber,
+                        lastepseason,
+                        lastepnumber,
+                        status,
+                    });
+                }
+            }
+        }
+    }
 
     match status {
         Some(ShowStatus::Running) => {
@@ -243,6 +281,14 @@ fn generate_msg(data: ShowData) -> String {
                         datefmt,
                         from_now,
                     );
+                } else if data.epname.is_some() {
+                    msg = format!(
+                        "Next episode of {} '{}' airs on {}{}",
+                        data.showname,
+                        data.epname.unwrap(),
+                        datefmt,
+                        from_now,
+                    );
                 } else {
                     msg = format!("Next episode of {} airs on {}", data.showname, datefmt,);
                 }
@@ -340,7 +386,7 @@ fn generate_msg(data: ShowData) -> String {
 pub async fn command_ep(bot_sender: mpsc::Sender<BotAction>, source: IrcChannel, params: &str) {
     let msg;
     if let Ok(json) = get_json(params).await {
-        msg = match parse_json(&json) {
+        msg = match parse_json(&json).await {
             Ok(data) => generate_msg(data),
             Err(e) => e,
         };
@@ -364,19 +410,20 @@ mod tests {
     #[tokio::test]
     async fn ended_series() {
         let json = get_json(&"Star Trek The Next Generation").await.unwrap();
-        let data = parse_json(&json).unwrap();
+        let data = parse_json(&json).await.unwrap();
         let msg = generate_msg(data);
 
-        assert_eq!(msg, "Last episode of Star Trek: The Next Generation 7x26 'All Good Things... (2)' aired on 1994-05-23");
+        let re_episode_found = Regex::new(r"Last episode of Star Trek: The Next Generation 7x26 'All Good Things... \(2\)' aired on 1994-05-23, .* years ago").unwrap();
+        assert!(re_episode_found.is_match(&msg));
     }
 
     #[tokio::test]
     async fn running_series() {
         let json = get_json(&"The Simpsons").await.unwrap();
-        let data = parse_json(&json).unwrap();
+        let data = parse_json(&json).await.unwrap();
         let msg = generate_msg(data);
 
-        let re_episode_found = Regex::new("Next episode of The Simpsons .*airs on.*").unwrap();
+        let re_episode_found = Regex::new(r"Next episode of The Simpsons .*airs on.*").unwrap();
 
         assert!(
             re_episode_found.is_match(&msg)
