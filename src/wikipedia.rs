@@ -148,6 +148,6 @@ mod tests {
     async fn en_wikipedia_title() {
         let summary = get_summary(&"en", &"Taiko").await.unwrap();
 
-        assert_eq!(summary, "Taiko (太鼓) are a broad range of Japanese percussion instruments. In Japanese, the term refers to any kind of drum, but outside Japan, it is used specifically to refer to any of the various Japanese drums called wadaiko (和太鼓, \"Japanese drums\") and to the form of ensemble taiko drumming more specifically called kumi-daiko (組太鼓, \"set of drums\"). The process of constructing taiko varies between manufacturers, and the preparation of both the drum body and skin can take several years depending on the method.");
+        assert!(summary.starts_with("Taiko (太鼓)"));
     }
 }

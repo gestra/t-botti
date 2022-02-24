@@ -339,10 +339,8 @@ mod tests {
     #[tokio::test]
     async fn urltitle_wikipedia() {
         let url = "https://en.wikipedia.org/wiki/Koro_(medicine)";
-        let expected_title = "Title: Koro is a culture bound delusional disorder in which an individual has an overpowering belief that their sex organs are retracting and will disappear, despite the lack of any true longstanding changes to the genitals.  Koro is also known as shrinking penis, and it is listed in the Diagnostic and Statistical Manual of Mental Disorders. / The syndrome occurs worldwide, and mass hysteria of genital-shrinkage anxiety has a history in Africa, Asia and Europe.".to_string();
         let title = title_from_url(url).await;
-
-        assert_eq!(title, Some(expected_title));
+        assert!(title.unwrap().starts_with("Title: Koro is"));
     }
 
     #[tokio::test]
