@@ -302,15 +302,15 @@ pub async fn command_fmi(
         "" => get_location(&prefix, &source.network),
         _ => params.to_owned(),
     };
-    let msg;
-    if let Ok(xml) = get_xml(&location).await {
-        msg = match parse_xml(&xml) {
+
+    let msg = if let Ok(xml) = get_xml(&location).await {
+        match parse_xml(&xml) {
             Ok(data) => generate_msg(data),
             Err(e) => e,
-        };
+        }
     } else {
-        msg = "Tietojen haku ei onnistunut".to_owned();
-    }
+        "Tietojen haku ei onnistunut".to_owned()
+    };
 
     let action = BotAction {
         target: source,

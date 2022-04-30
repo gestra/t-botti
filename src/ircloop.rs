@@ -14,7 +14,7 @@ use crate::botaction::{ActionType, BotAction};
 use crate::ClientQuery;
 
 fn edit_msg_for_output(mut s: String, max_len: usize) -> String {
-    s = s.replace("\n", " / ");
+    s = s.replace('\n', " / ");
 
     if s.len() <= max_len {
         return s;

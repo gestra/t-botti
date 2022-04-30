@@ -26,7 +26,7 @@ async fn get_xml(query: &str, appid: &str) -> reqwest::Result<String> {
 }
 
 fn clean_plaintext(text: &str) -> String {
-    text.to_string().replace(" | ", ": ").replace("\n", " | ").trim().to_owned()
+    text.to_string().replace(" | ", ": ").replace('\n', " | ").trim().to_owned()
 }
 
 fn response_from_xml(xml: &str) -> Result<String, String> {

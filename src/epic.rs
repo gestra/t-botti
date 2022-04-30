@@ -87,27 +87,22 @@ fn parse_json(json_text: &str) -> Result<Vec<String>, String> {
 }
 
 fn generate_msg(games: Vec<String>) -> String {
-    let msg: String;
-
     if games.is_empty() {
-        msg = "Ei ilmaisia pelejä Epicissä.".to_owned();
+        "Ei ilmaisia pelejä Epicissä.".to_owned()
     } else {
-        msg = format!("Epicissä nyt ilmaiseksi: {}", games.join(", "));
+        format!("Epicissä nyt ilmaiseksi: {}", games.join(", "))
     }
-
-    msg
 }
 
 pub async fn command_epic(bot_sender: mpsc::Sender<BotAction>, source: IrcChannel) {
-    let msg;
-    if let Ok(json) = get_json().await {
-        msg = match parse_json(&json) {
+    let msg = if let Ok(json) = get_json().await {
+        match parse_json(&json) {
             Ok(data) => generate_msg(data),
             Err(_) => "Virhe ilmaispelien haussa".to_owned(),
-        };
+        }
     } else {
-        msg = "Virhe ilmaispelien haussa".to_owned();
-    }
+        "Virhe ilmaispelien haussa".to_owned()
+    };
 
     let action = BotAction {
         target: source,

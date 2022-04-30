@@ -150,21 +150,22 @@ pub async fn command_openweathermap(
         "" => get_location(&prefix, &source.network),
         _ => params.to_owned(),
     };
-    let msg;
+
     let apikey = match config["openweathermap"]["apikey"].as_str() {
         Some(a) => a,
         _ => {
             return;
         }
     };
-    if let Ok(json) = get_json(&location, apikey).await {
-        msg = match parse_json(&json) {
+
+    let msg = if let Ok(json) = get_json(&location, apikey).await {
+        match parse_json(&json) {
             Ok(data) => generate_msg(data),
             Err(_) => "Unable to get weather data".to_owned(),
-        };
+        }
     } else {
-        msg = "Unable to get weather data".to_owned();
-    }
+        "Unable to get weather data".to_owned()
+    };
 
     let action = BotAction {
         target: source,

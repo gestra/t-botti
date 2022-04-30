@@ -85,7 +85,7 @@ pub async fn get_summary(lang: &str, title: &str) -> Result<String, String> {
         };
 
         if let Some(e) = json["query"]["pages"][0]["extract"].as_str() {
-            let summary = e.replace("\n", " / ");
+            let summary = e.replace('\n', " / ");
             return Ok(summary);
         }
     }

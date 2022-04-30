@@ -43,12 +43,11 @@ async fn command_echo(
     params: &str,
     prefix: Option<Prefix>,
 ) {
-    let msg_to_send;
-    if let Some(Prefix::Nickname(nick, user, host)) = prefix {
-        msg_to_send = format!("{}!{}@{}: {}", nick, user, host, params);
+    let msg_to_send = if let Some(Prefix::Nickname(nick, user, host)) = prefix {
+        format!("{}!{}@{}: {}", nick, user, host, params)
     } else {
-        msg_to_send = format!("Echo: {}", params);
-    }
+        format!("Echo: {}", params)
+    };
 
     bot_sender
         .send(BotAction {

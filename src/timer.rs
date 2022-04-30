@@ -32,12 +32,11 @@ pub async fn command_pizza(
     let mins = 12;
     let duration = Duration::minutes(mins);
 
-    let msg_to_send;
-    if let Some(Prefix::Nickname(nick, _user, _host)) = prefix {
-        msg_to_send = format!("Apua {}! Pikku pizza palaa!", nick);
+    let msg_to_send = if let Some(Prefix::Nickname(nick, _user, _host)) = prefix {
+        format!("Apua {}! Pikku pizza palaa!", nick)
     } else {
-        msg_to_send = "Apua! Pikku pizza palaa!".to_owned();
-    }
+        "Apua! Pikku pizza palaa!".to_owned()
+    };
 
     let confirmation_msg = format!("Huudan sitten {} minuutin päästä pizzasta.", mins);
 
@@ -71,12 +70,11 @@ pub async fn command_bigone(
     let mins = 15;
     let duration = Duration::minutes(mins);
 
-    let msg_to_send;
-    if let Some(Prefix::Nickname(nick, _user, _host)) = prefix {
-        msg_to_send = format!("Apua {}! Iso pizza palaa!", nick);
+    let msg_to_send = if let Some(Prefix::Nickname(nick, _user, _host)) = prefix {
+        format!("Apua {}! Iso pizza palaa!", nick)
     } else {
-        msg_to_send = "Apua! Iso pizza palaa!".to_owned();
-    }
+        "Apua! Iso pizza palaa!".to_owned()
+    };
 
     let confirmation_msg = format!("Huudan sitten {} minuutin päästä pizzasta.", mins);
 
@@ -215,12 +213,11 @@ pub async fn command_timer(
         return;
     }
 
-    let msg_to_send;
-    if let Some(Prefix::Nickname(nick, _user, _host)) = prefix {
-        msg_to_send = format!("{}: {}", nick, message_part);
+    let msg_to_send = if let Some(Prefix::Nickname(nick, _user, _host)) = prefix {
+        format!("{}: {}", nick, message_part)
     } else {
-        msg_to_send = format!("Timer: {}", message_part);
-    }
+        format!("Timer: {}", message_part)
+    };
 
     let total_secs = duration.num_seconds();
     let s = total_secs % 60;
