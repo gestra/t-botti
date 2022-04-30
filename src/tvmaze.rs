@@ -19,17 +19,19 @@ enum ShowStatus {
 }
 
 #[derive(Debug)]
+struct EpData {
+    name: Option<String>,
+    airdate: Option<DateTime<FixedOffset>>,
+    season: Option<i64>,
+    number: Option<i64>,
+}
+
+#[derive(Debug)]
 struct ShowData {
     showname: String,
-    epname: Option<String>,
-    lastepname: Option<String>,
-    epairdate: Option<DateTime<FixedOffset>>,
-    lastepairdate: Option<DateTime<FixedOffset>>,
-    epseason: Option<i64>,
-    epnumber: Option<i64>,
-    lastepseason: Option<i64>,
-    lastepnumber: Option<i64>,
     status: Option<ShowStatus>,
+    previousep: Option<EpData>,
+    nextep: Option<EpData>,
 }
 
 async fn get_json(showname: &str) -> reqwest::Result<String> {
@@ -46,17 +48,119 @@ async fn get_json(showname: &str) -> reqwest::Result<String> {
     Ok(json)
 }
 
+async fn get_url(url: &str) -> reqwest::Result<String> {
+    let j = HTTP_CLIENT.get(url).send().await?.text().await?;
+    Ok(j)
+}
+
+async fn get_ep_info(url: &str) -> Result<EpData, String> {
+    if let Ok(epjson) = get_url(url).await {
+        let nextj: serde_json::Value = match serde_json::from_str(&epjson) {
+            Ok(j) => j,
+            Err(_) => {
+                return Err("Error parsing JSON".to_owned());
+            }
+        };
+
+        let airdate = if let Some(airstamp) = nextj["airstamp"].as_str() {
+            if let Ok(dt) = DateTime::parse_from_rfc3339(airstamp) {
+                Some(dt)
+            } else {
+                None
+            }
+        } else {
+            None
+        };
+
+        let name = nextj["name"].as_str().map(|n| n.to_owned());
+
+        let season = nextj["season"].as_i64();
+        let number = nextj["number"].as_i64();
+
+        return Ok(EpData {
+            name,
+            airdate,
+            season,
+            number,
+        });
+    }
+
+    Err("Error parsing JSON".to_owned())
+}
+
+fn last_ep_from_eplist(json: &serde_json::Value) -> Option<EpData> {
+    if let Some(eps) = json["_embedded"]["episodes"].as_array() {
+        if let Some(ep) = eps.last() {
+            let airdate = if let Some(airstamp) = ep["airstamp"].as_str() {
+                if let Ok(dt) = DateTime::parse_from_rfc3339(airstamp) {
+                    Some(dt)
+                } else {
+                    None
+                }
+            } else {
+                None
+            };
+
+            let name = ep["name"].as_str().map(|n| n.to_owned());
+
+            let season = ep["season"].as_i64();
+            let number = ep["number"].as_i64();
+
+            return Some(EpData {
+                name,
+                airdate,
+                season,
+                number,
+            });
+        }
+    }
+
+    None
+}
+
+fn next_ep_from_eplist(json: &serde_json::Value) -> Option<EpData> {
+    let now: DateTime<Utc> = Utc::now();
+
+    let mut airdate = None;
+    let mut name = None;
+    let mut season = None;
+    let mut number = None;
+
+    if let Some(eps) = json["_embedded"]["episodes"].as_array() {
+        for ep in eps {
+            if let Some(airstamp) = ep["airstamp"].as_str() {
+                if let Ok(dt) = DateTime::parse_from_rfc3339(airstamp) {
+                    if dt > now {
+                        airdate = Some(dt);
+                        if let Some(n) = ep["name"].as_str() {
+                            name = Some(n.to_owned());
+                        }
+                        season = ep["season"].as_i64();
+                        number = ep["number"].as_i64();
+                        break;
+                    }
+                }
+            }
+        }
+
+        if name.is_some() && airdate.is_some() && season.is_some() && number.is_some() {
+            return Some(EpData {
+                name,
+                airdate,
+                season,
+                number,
+            });
+        }
+    }
+
+    None
+}
+
 async fn parse_json(json_text: &str) -> Result<ShowData, String> {
     let mut showname = String::new();
-    let mut epname = None;
-    let mut lastepname = None;
-    let mut epairdate = None;
-    let mut lastepairdate = None;
-    let mut epseason = None;
-    let mut epnumber = None;
-    let mut lastepseason = None;
-    let mut lastepnumber = None;
     let mut status = None;
+    let mut nextep = None;
+    let mut previousep = None;
 
     let json: serde_json::Value = match serde_json::from_str(json_text) {
         Ok(j) => j,
@@ -86,131 +190,41 @@ async fn parse_json(json_text: &str) -> Result<ShowData, String> {
         };
     }
 
-    let now: DateTime<Utc> = Utc::now();
-
-    async fn get_url(url: &str) -> reqwest::Result<String> {
-        let j = HTTP_CLIENT.get(url).send().await?.text().await?;
-        Ok(j)
+    if let Some(nextepurl) = json["_links"]["nextepisode"]["href"].as_str() {
+        if let Ok(ep) = get_ep_info(nextepurl).await {
+            nextep = Some(ep);
+        }
     }
 
-    if let Some(nextepurl) = json["_links"]["nextepisode"]["href"].as_str() {
-        if let Ok(nextepjson) = get_url(nextepurl).await {
-            let nextj: serde_json::Value = match serde_json::from_str(&nextepjson) {
-                Ok(j) => j,
-                Err(_) => {
-                    return Err("Error parsing JSON".to_owned());
-                }
-            };
-            if let Some(airstamp) = nextj["airstamp"].as_str() {
-                if let Ok(dt) = DateTime::parse_from_rfc3339(airstamp) {
-                    epairdate = Some(dt);
-                    if let Some(name) = nextj["name"].as_str() {
-                        epname = Some(name.to_owned());
-                    }
-                    epseason = nextj["season"].as_i64();
-                    epnumber = nextj["number"].as_i64();
-                    return Ok(ShowData {
-                        showname,
-                        epname,
-                        lastepname,
-                        epairdate,
-                        lastepairdate,
-                        epseason,
-                        epnumber,
-                        lastepseason,
-                        lastepnumber,
-                        status,
-                    });
-                }
-            }
+    if let Some(previousepurl) = json["_links"]["previousepisode"]["href"].as_str() {
+        if let Ok(ep) = get_ep_info(previousepurl).await {
+            previousep = Some(ep);
         }
     }
 
     match status {
         Some(ShowStatus::Running) => {
-            if let Some(eps) = json["_embedded"]["episodes"].as_array() {
-                for ep in eps {
-                    if let Some(airstamp) = ep["airstamp"].as_str() {
-                        if let Ok(dt) = DateTime::parse_from_rfc3339(airstamp) {
-                            if dt > now {
-                                epairdate = Some(dt);
-                                if let Some(name) = ep["name"].as_str() {
-                                    epname = Some(name.to_owned());
-                                }
-                                epseason = ep["season"].as_i64();
-                                epnumber = ep["number"].as_i64();
-                                break;
-                            }
-                        }
-                    }
-                }
-                if epairdate.is_none() {
-                    if let Some(lastep) = eps.last() {
-                        if let Some(airstamp) = lastep["airstamp"].as_str() {
-                            if let Ok(dt) = DateTime::parse_from_rfc3339(airstamp) {
-                                lastepairdate = Some(dt);
-                                if let Some(name) = lastep["name"].as_str() {
-                                    lastepname = Some(name.to_owned());
-                                }
-                                lastepseason = lastep["season"].as_i64();
-                                lastepnumber = lastep["number"].as_i64();
-                            }
-                        }
-                    }
-                }
+            if nextep.is_none() {
+                nextep = next_ep_from_eplist(&json);
             }
         }
         Some(ShowStatus::Ended) => {
-            if let Some(eps) = json["_embedded"]["episodes"].as_array() {
-                if let Some(lastep) = eps.last() {
-                    if let Some(airstamp) = lastep["airstamp"].as_str() {
-                        if let Ok(dt) = DateTime::parse_from_rfc3339(airstamp) {
-                            lastepairdate = Some(dt);
-                        }
-                    }
-                    if let Some(name) = lastep["name"].as_str() {
-                        lastepname = Some(name.to_owned());
-                    }
-                    lastepseason = lastep["season"].as_i64();
-                    lastepnumber = lastep["number"].as_i64();
-                }
+            if previousep.is_none() {
+                previousep = last_ep_from_eplist(&json);
             }
         }
         Some(ShowStatus::InDevelopment) => {
             debug!("Show in development");
-            if let Some(eps) = json["_embedded"]["episodes"].as_array() {
-                if let Some(firstep) = eps.first() {
-                    if let Some(airstamp) = firstep["airstamp"].as_str() {
-                        if let Ok(dt) = DateTime::parse_from_rfc3339(airstamp) {
-                            epairdate = Some(dt);
-                            debug!("Airdate: {:?}", epairdate);
-                        }
-                    }
-                    if let Some(name) = firstep["name"].as_str() {
-                        epname = Some(name.to_owned());
-                        debug!("Episode name: {:?}", epname);
-                    }
-                    epseason = firstep["season"].as_i64();
-                    debug!("Episode season: {:?}", epseason);
-                    epnumber = firstep["number"].as_i64();
-                    debug!("Episode number: {:?}", epnumber);
-                }
+            if nextep.is_none() {
+                nextep = next_ep_from_eplist(&json);
             }
         }
         Some(ShowStatus::Tbd) => {
-            if let Some(eps) = json["_embedded"]["episodes"].as_array() {
-                if let Some(lastep) = eps.last() {
-                    if let Some(airstamp) = lastep["airstamp"].as_str() {
-                        if let Ok(dt) = DateTime::parse_from_rfc3339(airstamp) {
-                            epairdate = Some(dt);
-                        }
-                    }
-                    if let Some(name) = lastep["name"].as_str() {
-                        epname = Some(name.to_owned());
-                    }
-                    epseason = lastep["season"].as_i64();
-                    epnumber = lastep["number"].as_i64();
-                }
+            if nextep.is_none() {
+                nextep = next_ep_from_eplist(&json);
+            }
+            if previousep.is_none() {
+                previousep = last_ep_from_eplist(&json);
             }
         }
         None => {}
@@ -218,15 +232,9 @@ async fn parse_json(json_text: &str) -> Result<ShowData, String> {
 
     Ok(ShowData {
         showname,
-        epname,
-        lastepname,
-        epairdate,
-        lastepairdate,
-        epseason,
-        epnumber,
-        lastepseason,
-        lastepnumber,
         status,
+        nextep,
+        previousep,
     })
 }
 
@@ -262,42 +270,40 @@ fn generate_msg(data: ShowData) -> String {
         }
     }
 
-    let msg;
-
-    match data.status {
-        Some(ShowStatus::Running) => {
-            if data.epairdate.is_some() {
-                let date = data.epairdate.unwrap();
+    fn next_ep_msg(data: &ShowData) -> String {
+        let msg;
+        if let Some(nextep) = &data.nextep {
+            if let Some(date) = nextep.airdate {
                 let datefmt = format!("{}-{:02}-{:02}", date.year(), date.month(), date.day());
                 let from_now = time_until_next_ep(date);
 
-                if data.epseason.is_some() && data.epnumber.is_some() && data.epname.is_some() {
+                if nextep.season.is_some() && nextep.number.is_some() && nextep.name.is_some() {
                     msg = format!(
                         "Next episode of {} {}x{} '{}' airs on {}{}",
                         data.showname,
-                        data.epseason.unwrap(),
-                        data.epnumber.unwrap(),
-                        data.epname.unwrap(),
+                        nextep.season.unwrap(),
+                        nextep.number.unwrap(),
+                        nextep.name.as_ref().unwrap(),
                         datefmt,
                         from_now,
                     );
-                } else if data.epname.is_some() {
+                } else if nextep.name.is_some() {
                     msg = format!(
                         "Next episode of {} '{}' airs on {}{}",
                         data.showname,
-                        data.epname.unwrap(),
+                        nextep.name.as_ref().unwrap(),
                         datefmt,
                         from_now,
                     );
                 } else {
                     msg = format!("Next episode of {} airs on {}", data.showname, datefmt,);
                 }
-            } else if data.lastepname.is_some()
-                && data.lastepnumber.is_some()
-                && data.lastepseason.is_some()
-                && data.lastepairdate.is_some()
-            {
-                let airdate = data.lastepairdate.unwrap();
+            } else {
+                msg = format!("Next episode of {} not found", data.showname);
+            }
+        } else if let Some(prevep) = &data.previousep {
+            if prevep.number.is_some() && prevep.season.is_some() && prevep.airdate.is_some() {
+                let airdate = prevep.airdate.unwrap();
                 let datefmt = format!(
                     "{}-{:02}-{:02}",
                     airdate.year(),
@@ -306,77 +312,72 @@ fn generate_msg(data: ShowData) -> String {
                 );
                 let from_now = time_from_last_ep(airdate);
                 msg = format!(
-                    "No airdate found for next episode of {}. Last episode {}x{} '{}' aired on {}{}",
-                    data.showname,
-                    data.lastepseason.unwrap(),
-                    data.lastepnumber.unwrap(),
-                    data.lastepname.unwrap(),
-                    datefmt,
-                    from_now,
-                );
+                        "No airdate found for next episode of {}. Last episode {}x{} '{}' aired on {}{}",
+                        data.showname,
+                        prevep.season.unwrap(),
+                        prevep.number.unwrap(),
+                        prevep.name.as_ref().unwrap(),
+                        datefmt,
+                        from_now,
+                    );
             } else {
-                msg = format!("No airdate found for next episode of {}", data.showname);
+                msg = format!("No episode of {} found", data.showname);
             }
+        } else {
+            msg = format!("No airdate found for next episode of {}", data.showname);
+        }
+
+        msg
+    }
+
+    let msg;
+
+    match data.status {
+        Some(ShowStatus::Running) => {
+            msg = next_ep_msg(&data);
         }
         Some(ShowStatus::Ended) => {
-            if let Some(date) = data.lastepairdate {
-                let datefmt = format!("{}-{:02}-{:02}", date.year(), date.month(), date.day());
-                let from_now = time_from_last_ep(date);
+            if let Some(prevep) = data.previousep {
+                if let Some(date) = prevep.airdate {
+                    let datefmt = format!("{}-{:02}-{:02}", date.year(), date.month(), date.day());
+                    let from_now = time_from_last_ep(date);
 
-                if data.lastepname.is_some()
-                    && data.lastepnumber.is_some()
-                    && data.lastepseason.is_some()
-                {
-                    let name = data.lastepname.unwrap();
-                    let epnum = data.lastepnumber.unwrap();
-                    let epseason = data.lastepseason.unwrap();
-                    msg = format!(
-                        "Last episode of {} {}x{} '{}' aired on {}{}",
-                        data.showname, epseason, epnum, name, datefmt, from_now
-                    );
+                    if prevep.name.is_some() && prevep.number.is_some() && prevep.season.is_some() {
+                        let name = prevep.name.unwrap();
+                        let epnum = prevep.number.unwrap();
+                        let epseason = prevep.season.unwrap();
+                        msg = format!(
+                            "Last episode of {} {}x{} '{}' aired on {}{}",
+                            data.showname, epseason, epnum, name, datefmt, from_now
+                        );
+                    } else {
+                        msg = format!("{} ended on {}{}", data.showname, datefmt, from_now);
+                    }
                 } else {
-                    msg = format!("{} ended on {}{}", data.showname, datefmt, from_now);
+                    msg = format!("{} has ended", data.showname);
                 }
             } else {
                 msg = format!("{} has ended", data.showname);
             }
         }
         Some(ShowStatus::InDevelopment) => {
-            if data.epairdate.is_some() {
-                let date = data.epairdate.unwrap();
-                let datefmt = format!("{}-{:02}-{:02}", date.year(), date.month(), date.day());
-                let from_now = time_until_next_ep(date);
-                msg = format!("{} will premiere on {}{}", data.showname, datefmt, from_now);
+            if let Some(nextep) = data.nextep {
+                if let Some(date) = nextep.airdate {
+                    let datefmt = format!("{}-{:02}-{:02}", date.year(), date.month(), date.day());
+                    let from_now = time_until_next_ep(date);
+                    msg = format!("{} will premiere on {}{}", data.showname, datefmt, from_now);
+                } else {
+                    msg = format!("{} is in development", data.showname);
+                }
             } else {
                 msg = format!("{} is in development", data.showname);
             }
         }
         Some(ShowStatus::Tbd) => {
-            if let Some(date) = data.epairdate {
-                let datefmt = format!("{}-{:02}-{:02}", date.year(), date.month(), date.day());
-                let from_now = time_from_last_ep(date);
-                if data.epname.is_some() && data.epnumber.is_some() && data.epseason.is_some() {
-                    msg = format!(
-                        "Status of {} is unknown. Last episode {}x{} '{}' aired on {}{}",
-                        data.showname,
-                        data.epseason.unwrap(),
-                        data.epnumber.unwrap(),
-                        data.epname.unwrap(),
-                        datefmt,
-                        from_now,
-                    );
-                } else {
-                    msg = format!(
-                        "Status of {} is unknown. Last episode aired on {}{}",
-                        data.showname, datefmt, from_now
-                    );
-                }
-            } else {
-                msg = format!("Status of {} is unknown", data.showname);
-            }
+            msg = next_ep_msg(&data);
         }
         None => {
-            msg = format!("Status of {} is unknown", data.showname);
+            msg = "Unknown status".to_owned();
         }
     }
 
@@ -384,15 +385,14 @@ fn generate_msg(data: ShowData) -> String {
 }
 
 pub async fn command_ep(bot_sender: mpsc::Sender<BotAction>, source: IrcChannel, params: &str) {
-    let msg;
-    if let Ok(json) = get_json(params).await {
-        msg = match parse_json(&json).await {
+    let msg = if let Ok(json) = get_json(params).await {
+        match parse_json(&json).await {
             Ok(data) => generate_msg(data),
             Err(e) => e,
-        };
+        }
     } else {
-        msg = "TVmaze API error".to_owned();
-    }
+        "TVmaze API error".to_owned()
+    };
 
     let action = BotAction {
         target: source,
