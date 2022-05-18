@@ -82,7 +82,7 @@ struct WeatherData {
 }
 
 async fn get_xml(place: &str) -> reqwest::Result<String> {
-    let starttime = Utc::now() - chrono::Duration::minutes(15);
+    let starttime = Utc::now() - chrono::Duration::minutes(30);
     let timestamp = starttime.to_rfc3339_opts(SecondsFormat::Secs, true);
 
     let baseurl = "https://opendata.fmi.fi/wfs";
