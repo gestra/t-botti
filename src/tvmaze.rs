@@ -302,7 +302,7 @@ fn generate_msg(data: ShowData) -> String {
                 msg = format!("Next episode of {} not found", data.showname);
             }
         } else if let Some(prevep) = &data.previousep {
-            if prevep.number.is_some() && prevep.season.is_some() && prevep.airdate.is_some() {
+            if prevep.airdate.is_some() {
                 let airdate = prevep.airdate.unwrap();
                 let datefmt = format!(
                     "{}-{:02}-{:02}",
@@ -311,15 +311,24 @@ fn generate_msg(data: ShowData) -> String {
                     airdate.day()
                 );
                 let from_now = time_from_last_ep(airdate);
-                msg = format!(
-                        "No airdate found for next episode of {}. Last episode {}x{} '{}' aired on {}{}",
+
+                msg = if prevep.number.is_some() && prevep.season.is_some() {
+                    format!(
+                        "No airdate found for next episode of {}. Last episode {}x{} aired on {}{}",
                         data.showname,
                         prevep.season.unwrap(),
                         prevep.number.unwrap(),
-                        prevep.name.as_ref().unwrap(),
                         datefmt,
                         from_now,
-                    );
+                    )
+                } else {
+                    format!(
+                        "No airdate found for next episode of {}. Last episode aired on {}{}",
+                        data.showname,
+                        datefmt,
+                        from_now,
+                    )
+                }
             } else {
                 msg = format!("No episode of {} found", data.showname);
             }
