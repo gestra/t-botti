@@ -18,6 +18,7 @@ use crate::blitzortung::command_ukkostutka;
 use crate::botaction::{ActionType, BotAction};
 use crate::epic::command_epic;
 use crate::fmi::command_fmi;
+use crate::gdq::command_gdq;
 use crate::h33h3::handle_h33h3;
 use crate::openweathermap::command_openweathermap;
 use crate::roll::command_roll;
@@ -157,6 +158,9 @@ async fn handle_command(
         }
         "ukkostutka" | "blitzortung" => {
             command_ukkostutka(bot_sender, source, params).await;
+        }
+        "agdq" | "sgdq" | "gdq" => {
+            command_gdq(bot_sender, source).await;
         }
         _ => {}
     }

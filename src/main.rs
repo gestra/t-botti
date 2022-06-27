@@ -21,6 +21,7 @@ mod botaction;
 mod blitzortung;
 mod epic;
 mod fmi;
+mod gdq;
 mod h33h3;
 mod openweathermap;
 mod ts3;
