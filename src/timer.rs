@@ -143,16 +143,16 @@ pub async fn command_timer(
             .unwrap();
 
         let now = chrono::Local::now();
-        let today = now.date();
+        let today = now.date_naive();
 
         if let Some(mut timer_datetime) = today.and_hms_opt(hour, minute, 0) {
-            let diff = timer_datetime - now;
+            let diff = timer_datetime - now.naive_local();
             if diff < Duration::seconds(0) {
                 let one_day = Duration::days(1);
                 timer_datetime = timer_datetime + one_day;
             }
 
-            duration = timer_datetime - now;
+            duration = timer_datetime - now.naive_local();
         } else {
             bot_sender
                 .send(BotAction {
@@ -308,7 +308,10 @@ fn get_timers_from_db(conn: &rusqlite::Connection) -> rusqlite::Result<Vec<(i64,
         let channel: String = row.get(3)?;
         let network: String = row.get(4)?;
 
-        let target_dt = DateTime::<Utc>::from_utc(NaiveDateTime::from_timestamp(timestamp, 0), Utc);
+        let target_dt = DateTime::<Utc>::from_utc(
+            NaiveDateTime::from_timestamp_opt(timestamp, 0).unwrap(),
+            Utc,
+        );
         let now = Utc::now();
         let time = target_dt - now;
 

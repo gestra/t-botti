@@ -240,8 +240,8 @@ async fn parse_json(json_text: &str) -> Result<ShowData, String> {
 
 fn generate_msg(data: ShowData) -> String {
     fn time_from_last_ep(dt: DateTime<FixedOffset>) -> String {
-        let today = Local::now().date();
-        let dur = dt.date().signed_duration_since(today);
+        let today = Local::now().date_naive();
+        let dur = dt.date_naive().signed_duration_since(today);
         let days = -dur.num_days();
         match days {
             0 => ", today".to_string(),
@@ -256,8 +256,8 @@ fn generate_msg(data: ShowData) -> String {
         }
     }
     fn time_until_next_ep(dt: DateTime<FixedOffset>) -> String {
-        let today = Local::now().date();
-        let dur = dt.date().signed_duration_since(today);
+        let today = Local::now().date_naive();
+        let dur = dt.date_naive().signed_duration_since(today);
         let days = dur.num_days();
         match days {
             0 => ", today".to_string(),
@@ -324,9 +324,7 @@ fn generate_msg(data: ShowData) -> String {
                 } else {
                     format!(
                         "No airdate found for next episode of {}. Last episode aired on {}{}",
-                        data.showname,
-                        datefmt,
-                        from_now,
+                        data.showname, datefmt, from_now,
                     )
                 }
             } else {

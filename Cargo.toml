@@ -19,7 +19,7 @@ select = "0.5"
 http = "0.2"
 serde_json = "1.0"
 rusqlite = "0.25"
-feed-rs = {git = "https://github.com/feed-rs/feed-rs.git", rev = "54aecf28a37e6302bb3e497a0e0a1424f3922195"}
+feed-rs = "1.2"
 url = "2.2"
 xmltree = "0.10"
 rand = "0.8"
