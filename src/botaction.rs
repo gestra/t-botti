@@ -4,13 +4,13 @@
 
 use crate::IrcChannel;
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Eq)]
 pub enum ActionType {
     Message(String),
     Action(String),
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Eq)]
 pub struct BotAction {
     pub target: IrcChannel,
     pub action_type: ActionType,

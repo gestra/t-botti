@@ -52,7 +52,7 @@ mod tvmaze;
 
 mod wikipedia;
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Eq)]
 pub struct IrcChannel {
     network: String,
     channel: String,
@@ -65,7 +65,7 @@ pub enum ClientQuery {
 
 fn read_config_file() -> Result<String, ()> {
     let path = Path::new("config.yml");
-    let mut file = match File::open(&path) {
+    let mut file = match File::open(path) {
         Err(_) => {
             error!("Error when opening config.yml");
             error!("Copy config.yml.example as config.yml in the same directory as the executable and edit it to your liking.");

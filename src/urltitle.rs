@@ -313,14 +313,14 @@ pub async fn parse_twitter(id: &str) -> Option<String> {
         false => format!("{} ({})", fullname, screenname),
     };
 
-    return Some(format!(
+    Some(format!(
         "Title: {} {}: {} [♻ {} ♥ {}]",
         print_name,
         timestr(created),
         text,
         retweets,
         favorites
-    ));
+    ))
 }
 
 #[cfg(test)]

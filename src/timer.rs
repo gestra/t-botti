@@ -149,7 +149,7 @@ pub async fn command_timer(
             let diff = timer_datetime - now.naive_local();
             if diff < Duration::seconds(0) {
                 let one_day = Duration::days(1);
-                timer_datetime = timer_datetime + one_day;
+                timer_datetime += one_day;
             }
 
             duration = timer_datetime - now.naive_local();
