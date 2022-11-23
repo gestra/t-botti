@@ -46,6 +46,8 @@ mod urltitle;
 
 mod roll;
 
+mod sahko;
+
 mod tvmaze;
 
 mod wikipedia;

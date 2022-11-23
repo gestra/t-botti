@@ -23,6 +23,7 @@ use crate::h33h3::handle_h33h3;
 use crate::openweathermap::command_openweathermap;
 use crate::roll::command_roll;
 use crate::rss::command_rss;
+use crate::sahko::command_sahko;
 use crate::timer::{command_bigone, command_pizza, command_timer, TimerEvent};
 use crate::ts3::command_ts;
 use crate::tvmaze::command_ep;
@@ -161,6 +162,9 @@ async fn handle_command(
         }
         "agdq" | "sgdq" | "gdq" => {
             command_gdq(bot_sender, source).await;
+        }
+        "sähkö" | "sahko" => {
+            command_sahko(bot_sender, source, config).await;
         }
         _ => {}
     }

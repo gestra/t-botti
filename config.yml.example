@@ -19,3 +19,6 @@ teamspeak3:
   host: 'host'
   serverquery_login: 'name'
   serverquery_password: 'password'
+
+fingrid:
+  apikey: '123-ABC-456-DEF'
