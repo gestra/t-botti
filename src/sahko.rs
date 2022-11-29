@@ -97,7 +97,7 @@ fn parse_json(price_json: &str, fingrid_json: &str) -> Result<ElecData, String> 
 
 fn generate_msg(data: ElecData) -> String {
     format!(
-        "Sähkön spot-hinta: {} snt/kWh | Tuotanto: {} MW | Kulutus: {} MW | Tuonti-/vienti+: {} MW",
+        "Sähkön spot-hinta: {:.2} snt/kWh | Tuotanto: {} MW | Kulutus: {} MW | Tuonti-/vienti+: {} MW",
         data.price, data.production, data.consumption, data.importexport
     )
 }
