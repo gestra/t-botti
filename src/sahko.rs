@@ -13,7 +13,7 @@ use crate::IrcChannel;
 
 async fn get_json(fingrid_api_key: &str) -> Result<(String, String), reqwest::Error> {
     let priceurl = "https://api.spot-hinta.fi/Today";
-    let fingridurl = "https://api.fingrid.fi/v1/variable/event/json/192%2C193%2C194";
+    let fingridurl = "https://api.fingrid.fi/v1/variable/event/json/192%2C193%2C194%2C209";
 
     let price_req = HTTP_CLIENT.get(priceurl).send(); //.await?.text().await?;
     let fingrid_req = HTTP_CLIENT
@@ -32,6 +32,7 @@ struct ElecData {
     consumption: f64,
     production: f64,
     importexport: f64,
+    state: u64,
 }
 
 fn parse_json(price_json: &str, fingrid_json: &str) -> Result<ElecData, String> {
@@ -63,32 +64,35 @@ fn parse_json(price_json: &str, fingrid_json: &str) -> Result<ElecData, String> 
     let mut consumption: Option<f64> = None;
     let mut production: Option<f64> = None;
     let mut importexport: Option<f64> = None;
+    let mut state: Option<u64> = None;
 
     if let Some(d) = fg.as_array() {
         for info in d {
-            if let Some(value) = info["value"].as_f64() {
-                match info["variable_id"].as_i64() {
-                    Some(192) => {
-                        production = Some(value);
-                    }
-                    Some(193) => {
-                        consumption = Some(value);
-                    }
-                    Some(194) => {
-                        importexport = Some(value);
-                    }
-                    _ => {}
+            match info["variable_id"].as_i64() {
+                Some(192) => {
+                    production = info["value"].as_f64();
                 }
+                Some(193) => {
+                    consumption = info["value"].as_f64();
+                }
+                Some(194) => {
+                    importexport = info["value"].as_f64();
+                }
+                Some(209) => {
+                    state = info["value"].as_u64();
+                }
+                _ => {}
             }
         }
     }
 
-    if let (Some(c), Some(p), Some(i)) = (consumption, production, importexport) {
+    if let (Some(c), Some(p), Some(i), Some(s)) = (consumption, production, importexport, state) {
         Ok(ElecData {
             price: price_with_tax.unwrap() * 100.0,
             consumption: c,
             production: p,
             importexport: i,
+            state: s,
         })
     } else {
         Err("Fingrid-tietojen hakemisessa virhe".to_string())
@@ -96,9 +100,17 @@ fn parse_json(price_json: &str, fingrid_json: &str) -> Result<ElecData, String> 
 }
 
 fn generate_msg(data: ElecData) -> String {
+    let state_msg = match data.state {
+        1 => "Normaali",
+        2 => "Sähköjärjestelmän käyttötilanne on heikentynyt. Sähkön riittävyys Suomessa on uhattuna (sähköpulan riski on suuri) tai voimajärjestelmä ei täytä käyttövarmuuskriteerejä",
+        3 => "Sähköjärjestelmän käyttövarmuus on vaarassa. Sähkönkulutusta on kytketty irti voimajärjestelmän käyttövarmuuden turvaamiseksi (sähköpula) tai riski laajaan sähkökatkoon on huomattava.",
+        4 => "Vakava laajaa osaa tai koko Suomea kattava häiriö.",
+        5 => "Vakavan häiriön käytönpalautus on menossa.",
+        _ => "Tuntematon",
+    };
     format!(
-        "Sähkön spot-hinta: {:.2} snt/kWh | Tuotanto: {} MW | Kulutus: {} MW | Tuonti-/vienti+: {} MW",
-        data.price, data.production, data.consumption, data.importexport
+        "Sähkön spot-hinta: {:.2} snt/kWh | Tuotanto: {} MW | Kulutus: {} MW | Tuonti-/vienti+: {} MW | Sähköjärjestelmän käyttötila: {}",
+        data.price, data.production, data.consumption, data.importexport, state_msg
     )
 }
 
