@@ -101,15 +101,15 @@ fn parse_json(price_json: &str, fingrid_json: &str) -> Result<ElecData, String> 
 
 fn generate_msg(data: ElecData) -> String {
     let state_msg = match data.state {
-        1 => "Normaali",
-        2 => "Sähköjärjestelmän käyttötilanne on heikentynyt. Sähkön riittävyys Suomessa on uhattuna (sähköpulan riski on suuri) tai voimajärjestelmä ei täytä käyttövarmuuskriteerejä",
-        3 => "Sähköjärjestelmän käyttövarmuus on vaarassa. Sähkönkulutusta on kytketty irti voimajärjestelmän käyttövarmuuden turvaamiseksi (sähköpula) tai riski laajaan sähkökatkoon on huomattava.",
-        4 => "Vakava laajaa osaa tai koko Suomea kattava häiriö.",
-        5 => "Vakavan häiriön käytönpalautus on menossa.",
-        _ => "Tuntematon",
+        1 => "",
+        2 => " | Sähköjärjestelmän käyttötila: Sähköjärjestelmän käyttötilanne on heikentynyt. Sähkön riittävyys Suomessa on uhattuna (sähköpulan riski on suuri) tai voimajärjestelmä ei täytä käyttövarmuuskriteerejä",
+        3 => " | Sähköjärjestelmän käyttötila: Sähköjärjestelmän käyttövarmuus on vaarassa. Sähkönkulutusta on kytketty irti voimajärjestelmän käyttövarmuuden turvaamiseksi (sähköpula) tai riski laajaan sähkökatkoon on huomattava.",
+        4 => " | Sähköjärjestelmän käyttötila: Vakava laajaa osaa tai koko Suomea kattava häiriö.",
+        5 => " | Sähköjärjestelmän käyttötila: Vakavan häiriön käytönpalautus on menossa.",
+        _ => " | Sähköjärjestelmän käyttötila: Tuntematon",
     };
     format!(
-        "Sähkön spot-hinta: {:.2} snt/kWh | Tuotanto: {} MW | Kulutus: {} MW | Tuonti-/vienti+: {} MW | Sähköjärjestelmän käyttötila: {}",
+        "Sähkön spot-hinta: {:.2} snt/kWh | Tuotanto: {} MW | Kulutus: {} MW | Tuonti-/vienti+: {} MW{}",
         data.price, data.production, data.consumption, data.importexport, state_msg
     )
 }
