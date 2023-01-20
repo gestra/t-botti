@@ -109,7 +109,7 @@ async fn handle_command(
 
     info!("Command {} called by {:?}", command, prefix);
 
-    match command {
+    match command.to_lowercase().as_str() {
         "echo" => {
             command_echo(bot_sender, source, params, prefix).await;
         }
