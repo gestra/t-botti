@@ -114,25 +114,19 @@ pub async fn command_timer(
         static ref RE_MINUTES: Regex = Regex::new(r"^(?:(?P<minute>\d+))?$").unwrap();
     }
 
-    let mut time_part = String::new();
-    let mut message_part = String::new();
-    let mut processing_time = true;
-    for c in params.chars() {
-        if processing_time {
-            if !c.is_whitespace() {
-                time_part.push(c);
-            } else {
-                processing_time = false;
-            }
-        } else {
-            message_part.push(c);
-        }
+    let time_part;
+    let message_part;
+    if let Some((t, m)) = params.split_once(char::is_whitespace) {
+        time_part = t;
+        message_part = m;
+    } else {
+        return;
     }
 
     let duration;
 
-    if RE_HHMM.is_match(&time_part) {
-        let captures = RE_HHMM.captures(&time_part).unwrap();
+    if RE_HHMM.is_match(time_part) {
+        let captures = RE_HHMM.captures(time_part).unwrap();
         let hour = captures
             .name("hour")
             .map(|h| h.as_str().parse::<u32>().unwrap())
@@ -166,8 +160,8 @@ pub async fn command_timer(
                 .unwrap();
             return;
         }
-    } else if RE_HMS.is_match(&time_part) {
-        let captures = RE_HMS.captures(&time_part).unwrap();
+    } else if RE_HMS.is_match(time_part) {
+        let captures = RE_HMS.captures(time_part).unwrap();
         let mut dur = Duration::seconds(0);
         if let Some(hour) = captures
             .name("hour")
@@ -189,8 +183,8 @@ pub async fn command_timer(
         }
 
         duration = dur;
-    } else if RE_MINUTES.is_match(&time_part) {
-        let captures = RE_MINUTES.captures(&time_part).unwrap();
+    } else if RE_MINUTES.is_match(time_part) {
+        let captures = RE_MINUTES.captures(time_part).unwrap();
         let minute = captures
             .name("minute")
             .map(|h| h.as_str().parse::<i64>().unwrap())
