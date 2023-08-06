@@ -163,9 +163,9 @@ mod tests {
 
     #[tokio::test]
     async fn urltitle_wikipedia() {
-        let url = "https://en.wikipedia.org/wiki/Koro_(medicine)";
+        let url = "https://en.wikipedia.org/wiki/Miyamoto_Musashi";
         let title = title_from_url(url).await;
-        assert!(title.unwrap().starts_with("Title: Koro is"));
+        assert!(title.unwrap().starts_with("Title: Miyamoto Musashi"));
     }
 
     #[tokio::test]
