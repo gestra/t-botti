@@ -2,11 +2,9 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
-use chrono::prelude::*;
-use http::Method;
 use log::debug;
 use regex::Regex;
-use reqwest::header::{HeaderMap, HeaderName, CONTENT_LENGTH, CONTENT_TYPE};
+use reqwest::header::{CONTENT_LENGTH, CONTENT_TYPE};
 use select::document::Document;
 use select::predicate::Name;
 use tokio::sync::mpsc;
@@ -23,18 +21,10 @@ async fn title_from_url(url: &str) -> Option<String> {
     debug!("Trying to get title for url {}", url);
 
     lazy_static! {
-        static ref RE_TWITTER_URL: Regex =
-            Regex::new(r"https?://(?:mobile\.)?twitter\.com/[^/]+/status/(?P<id>\d+)/?.*").unwrap();
         static ref RE_WIKIPEDIA_URL: Regex =
             Regex::new(r"https?://(?P<lang>..)\.wikipedia.org/wiki/(?P<title>[^/]+)").unwrap();
     }
 
-    if RE_TWITTER_URL.is_match(url) {
-        let caps = RE_TWITTER_URL.captures(url)?;
-        let id = caps.name("id")?.as_str();
-        debug!("Looks like a Twitter URL");
-        return parse_twitter(id).await;
-    }
     if RE_WIKIPEDIA_URL.is_match(url) {
         let caps = RE_WIKIPEDIA_URL.captures(url)?;
         let title = caps.name("title")?.as_str();
@@ -158,171 +148,6 @@ async fn parse_wikipedia(lang: &str, title: &str) -> Option<String> {
     }
 }
 
-pub async fn parse_twitter(id: &str) -> Option<String> {
-    async fn get_token(auth: &str) -> Option<String> {
-        let mut headers = HeaderMap::new();
-        headers.insert(
-            HeaderName::from_static("authorization"),
-            auth.parse().unwrap(),
-        );
-        headers.insert(
-            reqwest::header::ACCEPT,
-            "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8"
-                .parse()
-                .unwrap(),
-        );
-        headers.insert(
-            reqwest::header::ACCEPT_LANGUAGE,
-            "en-US,en;q=0.5".parse().unwrap(),
-        );
-        headers.insert(reqwest::header::CONNECTION, "keep-alive".parse().unwrap());
-
-        let activate_url = "https://api.twitter.com/1.1/guest/activate.json";
-
-        let request = HTTP_CLIENT
-            .request(Method::POST, activate_url)
-            .headers(headers)
-            .send()
-            .await;
-
-        let resp = match request {
-            Ok(r) => {
-                if let Ok(re) = r.text().await {
-                    re
-                } else {
-                    return None;
-                }
-            }
-            Err(_) => {
-                return None;
-            }
-        };
-        let json: serde_json::Value = match serde_json::from_str(&resp) {
-            Ok(j) => j,
-            Err(_) => {
-                return None;
-            }
-        };
-
-        json["guest_token"].as_str().map(|token| token.to_owned())
-    }
-
-    fn timestr(time: &str) -> String {
-        let dt = match DateTime::parse_from_str(time, "%a %b %d %H:%M:%S %z %Y") {
-            Ok(d) => d.naive_utc(),
-            Err(_) => {
-                return "".to_string();
-            }
-        };
-        let now = Utc::now().naive_utc();
-        let diff = now - dt;
-
-        let approx;
-        if diff.num_days() >= (30 * 6) {
-            approx = dt.format("%Y-%m-%d").to_string();
-        } else if diff.num_days() > 30 {
-            approx = dt.format("%b %d").to_string();
-        } else if diff.num_days() >= 1 {
-            approx = format!("{}d", diff.num_days());
-        } else if diff.num_hours() >= 1 {
-            approx = format!("{}h", diff.num_hours());
-        } else {
-            approx = format!("{}min", diff.num_minutes());
-        }
-
-        approx
-    }
-
-    let auth = "Bearer AAAAAAAAAAAAAAAAAAAAANRILgAAAAAAnNwIzUejRCOuH5E6I8xnZz4puTs%3D1Zv7ttfk8LF81IUq16cHjhLTvJu4FA33AGWWjCpTnA";
-    let token = get_token(auth).await?;
-
-    let mut headers = HeaderMap::new();
-    headers.insert(
-        HeaderName::from_static("authorization"),
-        auth.parse().unwrap(),
-    );
-    headers.insert(reqwest::header::CONNECTION, "keep-alive".parse().unwrap());
-    headers.insert(
-        reqwest::header::CONTENT_TYPE,
-        "application/json".parse().unwrap(),
-    );
-    headers.insert(
-        HeaderName::from_static("x-guest-token"),
-        token.parse().unwrap(),
-    );
-    headers.insert(
-        HeaderName::from_static("x-twitter-active-user"),
-        "yes".parse().unwrap(),
-    );
-    headers.insert(
-        HeaderName::from_static("authority"),
-        "api.twitter.com".parse().unwrap(),
-    );
-    headers.insert(
-        reqwest::header::ACCEPT_LANGUAGE,
-        "en-US,en;q=0.9".parse().unwrap(),
-    );
-    headers.insert(reqwest::header::ACCEPT, "*/*".parse().unwrap());
-    headers.insert(reqwest::header::DNT, "1".parse().unwrap());
-
-    let request = HTTP_CLIENT
-        .request(
-            Method::GET,
-            &format!(
-                "https://api.twitter.com/2/timeline/conversation/{}.json",
-                id
-            ),
-        )
-        .headers(headers)
-        .query(&[("tweet_mode", "extended")])
-        .send()
-        .await;
-
-    let resp = match request {
-        Ok(r) => {
-            if let Ok(re) = r.text().await {
-                re
-            } else {
-                return None;
-            }
-        }
-        Err(_) => {
-            return None;
-        }
-    };
-    let json: serde_json::Value = match serde_json::from_str(&resp) {
-        Ok(j) => j,
-        Err(_) => {
-            return None;
-        }
-    };
-
-    let tweet_info = &json["globalObjects"]["tweets"][id];
-    let text = tweet_info["full_text"].as_str()?;
-    let retweets = tweet_info["retweet_count"].as_u64()?;
-    let favorites = tweet_info["favorite_count"].as_u64()?;
-    let created = tweet_info["created_at"].as_str()?;
-    let user_id = tweet_info["user_id_str"].as_str()?;
-
-    let user_info = &json["globalObjects"]["users"][user_id];
-    let fullname = user_info["name"].as_str()?;
-    let screenname = user_info["screen_name"].as_str()?;
-    let verified = !matches!(user_info["verified"], serde_json::Value::Null);
-    let print_name = match verified {
-        true => format!("{} (✔{})", fullname, screenname),
-        false => format!("{} ({})", fullname, screenname),
-    };
-
-    Some(format!(
-        "Title: {} {}: {} [♻ {} ♥ {}]",
-        print_name,
-        timestr(created),
-        text,
-        retweets,
-        favorites
-    ))
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -361,15 +186,5 @@ mod tests {
         let title = title_from_url(url).await;
 
         assert_eq!(title, Some(expected_title));
-    }
-
-    #[tokio::test]
-    async fn urltitle_twitter() {
-        let url = "https://twitter.com/BillGates/status/1352662770416664577";
-        let re_expected_title = Regex::new(
-            r"^Title: Bill Gates \(✔BillGates\) [^:]*: One of the benefits of being 65 is that I’m eligible for the COVID-19 vaccine. I got my first dose this week, and I feel great. Thank you to all of the scientists, trial participants, regulators, and frontline healthcare workers who got us to this point. https://t.co/67SIfrG1Yd \[♻ \d+ ♥ \d+\]$").unwrap();
-        let title = title_from_url(url).await.unwrap();
-
-        assert!(re_expected_title.is_match(&title));
     }
 }
