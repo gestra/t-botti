@@ -78,6 +78,7 @@ struct WeatherData {
     feels_like: Option<String>,
     humidity: Option<String>,
     cloudiness: Option<String>,
+    snow_depth: Option<String>,
     wawa: Option<String>,
 }
 
@@ -143,6 +144,7 @@ fn parse_xml(xml: &str) -> Result<WeatherData, String> {
     let mut feels_like = None;
     let mut humidity = None;
     let mut cloudiness = None;
+    let mut snow_depth = None;
     let mut wawa = None;
 
     if let Some(p) = root
@@ -210,6 +212,15 @@ fn parse_xml(xml: &str) -> Result<WeatherData, String> {
                                     }
                                 }
                             }
+                            "obs-obs-1-1-snow_aws" => {
+                                if value != "NaN" {
+                                    if let Ok(v) = value.parse::<f64>() {
+                                        if v > 0.0 {
+                                            snow_depth = Some(value.to_owned());
+                                        }
+                                    }
+                                }
+                            }
                             _ => {}
                         }
                     }
@@ -253,6 +264,7 @@ fn parse_xml(xml: &str) -> Result<WeatherData, String> {
         feels_like,
         humidity,
         cloudiness,
+        snow_depth,
         wawa,
     })
 }
@@ -280,6 +292,9 @@ fn generate_msg(data: WeatherData) -> String {
     }
     if let Some(c) = data.cloudiness {
         msg.push_str(&format!("pilvisyys: {}/8, ", c));
+    }
+    if let Some(s) = data.snow_depth {
+        msg.push_str(&format!("lumen syvyys: {}cm, ", s));
     }
     if let Some(w) = data.wawa {
         msg.push_str(&w);
